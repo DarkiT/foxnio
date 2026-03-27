@@ -1,4 +1,6 @@
 //! 网关请求转发
+//!
+//! 支持 HTTP/2 和 HTTP/1.1 自动协商
 
 use anyhow::Result;
 use axum::{
@@ -9,21 +11,66 @@ use axum::{
 use hyper::body::Incoming;
 use reqwest::Client;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::gateway::SharedState;
+use crate::config::Http2ClientConfig;
 
+/// HTTP/2 代理客户端
 pub struct ProxyClient {
     http_client: Client,
+    http2_client: Option<Client>,
+    config: Http2ClientConfig,
 }
 
 impl ProxyClient {
+    /// 创建新的代理客户端
     pub fn new() -> Self {
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(300))
+        Self::with_config(Http2ClientConfig::default())
+    }
+
+    /// 使用配置创建代理客户端
+    pub fn with_config(config: Http2ClientConfig) -> Self {
+        let http_client = Self::build_client(&config, false);
+        let http2_client = if config.enabled {
+            Some(Self::build_client(&config, true))
+        } else {
+            None
+        };
+
+        Self {
+            http_client,
+            http2_client,
+            config,
+        }
+    }
+
+    /// 构建 HTTP 客户端
+    fn build_client(config: &Http2ClientConfig, http2_only: bool) -> Client {
+        let mut builder = Client::builder()
+            .timeout(config.request_timeout())
+            .connect_timeout(config.connect_timeout())
+            .pool_max_idle_per_host(config.max_idle_connections)
+            .pool_idle_timeout(config.pool_keep_alive())
+            .tcp_keepalive(config.tcp_keepalive())
+            .tcp_nodelay(config.tcp_nodelay);
+
+        if http2_only {
+            // HTTP/2 only mode
+            builder = builder
+                .http2_initial_stream_window_size(config.initial_stream_window_size)
+                .http2_max_concurrent_streams(config.max_concurrent_streams)
+                .http2_prior_knowledge();
+        } else if config.auto_negotiate {
+            // Auto negotiate: support both HTTP/1.1 and HTTP/2
+            builder = builder
+                .http2_initial_stream_window_size(config.initial_stream_window_size)
+                .http2_max_concurrent_streams(config.max_concurrent_streams);
+        }
+
+        builder
             .build()
-            .expect("Failed to create HTTP client");
-        
-        Self { http_client: client }
+            .expect("Failed to create HTTP client")
     }
 
     /// 转发请求到上游
@@ -40,9 +87,12 @@ impl ProxyClient {
 
         // 构建上游 URL
         let upstream_uri = format!("{}{}", upstream_url, path);
-        
+
+        // 选择客户端 (基于配置和上游 URL)
+        let client = self.select_client(upstream_url);
+
         // 构建请求
-        let mut req_builder = self.http_client.request(
+        let mut req_builder = client.request(
             match method {
                 Method::GET => reqwest::Method::GET,
                 Method::POST => reqwest::Method::POST,
@@ -90,6 +140,36 @@ impl ProxyClient {
         let body = response.bytes().await?;
         Ok(builder.body(Body::from(body))?)
     }
+
+    /// 选择合适的客户端
+    fn select_client(&self, upstream_url: &str) -> &Client {
+        // 如果启用了 HTTP/2 且支持 HTTP/2 prior knowledge
+        if self.config.enabled {
+            // 检查上游是否已知支持 HTTP/2
+            if self.is_http2_upstream(upstream_url) {
+                return self.http2_client.as_ref().unwrap_or(&self.http_client);
+            }
+        }
+        &self.http_client
+    }
+
+    /// 检查上游是否支持 HTTP/2
+    fn is_http2_upstream(&self, upstream_url: &str) -> bool {
+        // 已知支持 HTTP/2 的上游服务
+        let http2_upstreams = [
+            "api.anthropic.com",
+            "api.openai.com",
+            "generativelanguage.googleapis.com",
+            "api.cohere.ai",
+        ];
+
+        http2_upstreams.iter().any(|&upstream| upstream_url.contains(upstream))
+    }
+
+    /// 获取客户端配置
+    pub fn config(&self) -> &Http2ClientConfig {
+        &self.config
+    }
 }
 
 impl Default for ProxyClient {
@@ -102,18 +182,54 @@ impl Default for ProxyClient {
 pub struct UpstreamEndpoints;
 
 impl UpstreamEndpoints {
-    /// Anthropic API 端点
+    /// Anthropic API 端点 (支持 HTTP/2)
     pub fn anthropic() -> &'static str {
         "https://api.anthropic.com"
     }
 
-    /// OpenAI API 端点
+    /// OpenAI API 端点 (支持 HTTP/2)
     pub fn openai() -> &'static str {
         "https://api.openai.com"
     }
 
-    /// Google Gemini API 端点
+    /// Google Gemini API 端点 (支持 HTTP/2)
     pub fn gemini() -> &'static str {
         "https://generativelanguage.googleapis.com"
+    }
+
+    /// Cohere API 端点 (支持 HTTP/2)
+    pub fn cohere() -> &'static str {
+        "https://api.cohere.ai"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_proxy_client_creation() {
+        let client = ProxyClient::new();
+        assert!(client.config.enabled);
+    }
+
+    #[test]
+    fn test_http2_client_config() {
+        let config = Http2ClientConfig {
+            enabled: true,
+            pool_size: 16,
+            auto_negotiate: true,
+            ..Default::default()
+        };
+        let client = ProxyClient::with_config(config);
+        assert!(client.http2_client.is_some());
+    }
+
+    #[test]
+    fn test_is_http2_upstream() {
+        let client = ProxyClient::new();
+        assert!(client.is_http2_upstream("https://api.anthropic.com"));
+        assert!(client.is_http2_upstream("https://api.openai.com"));
+        assert!(!client.is_http2_upstream("https://unknown-api.com"));
     }
 }

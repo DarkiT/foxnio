@@ -12,26 +12,38 @@ use tower_http::{
     trace::TraceLayer,
 };
 use serde_json::json;
+use std::sync::Arc;
 
 use super::{SharedState, middleware, handler::GatewayHandler};
 use crate::service::{UserService, ApiKeyService, AccountService, BillingService, SchedulerService};
 use crate::handler;
+use crate::health::HealthChecker;
 
-pub fn build_app(state: super::AppState) -> Router {
+pub fn build_app(state: super::AppState, health_checker: Arc<HealthChecker>) -> Router {
     let shared_state = Arc::new(state);
     
     // 公开路由
     let public_routes = Router::new()
-        // Health check
-        .route("/health", get(|| async { "OK" }))
-        .route("/ready", get(health_check))
+        // Health check endpoints
+        .route("/health", get(handler::health_simple))
+        .route("/health/live", get(handler::health_live))
+        .route("/health/ready", get(handler::health_ready))
+        .route("/health/detailed", get(handler::health_detailed))
+        .route("/health/resources", get(handler::health_resources))
+        .route("/health/database", get(handler::health_database))
+        .route("/health/redis", get(handler::health_redis))
+        .route("/health/info", get(handler::app_info))
+        .route("/metrics", get(handler::metrics))
         
         // API 端点（OpenAI 兼容）
         .route("/v1/models", get(handler::list_models))
         
         // 认证
         .route("/api/v1/auth/register", post(handler::auth::register))
-        .route("/api/v1/auth/login", post(handler::auth::login));
+        .route("/api/v1/auth/login", post(handler::auth::login))
+        
+        // 添加 HealthChecker 状态
+        .with_state(health_checker.clone());
     
     // 需要认证的路由
     let auth_routes = Router::new()
@@ -84,6 +96,8 @@ pub fn build_app(state: super::AppState) -> Router {
         .merge(admin_routes)
         .merge(gemini_routes)
         
+        // Layers - 压缩中间件
+        .layer(axum::middleware::from_fn(middleware::compression_middleware))
         // Layers
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
         .layer(TraceLayer::new_for_http())

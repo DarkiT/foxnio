@@ -26,3 +26,74 @@ gateway:
   user_balance: 0
   api_key_prefix: "sk-"
   rate_multiplier: 1.0
+
+# ============================================================================
+# HTTP/2 Configuration
+# ============================================================================
+
+# HTTP/2 服务器配置
+http2:
+  # 是否启用 HTTP/2
+  enabled: true
+  # 最大并发流数量
+  max_concurrent_streams: 200
+  # 初始流窗口大小 (bytes)
+  initial_stream_window_size: 65535
+  # 初始连接窗口大小 (bytes)
+  initial_connection_window_size: 65535
+  # 是否启用自适应窗口
+  adaptive_window: true
+  # Keep-alive 间隔 (秒)
+  keep_alive_interval_secs: 30
+  # Keep-alive 超时 (秒)
+  keep_alive_timeout_secs: 20
+  # 最大帧大小 (bytes)
+  max_frame_size: 16384
+  # 最大头部列表大小 (bytes)
+  max_header_list_size: 65536
+  # 启用连接重置流
+  enable_connect_protocol: false
+
+# TLS 配置 (用于 HTTP/2)
+# 注意: HTTP/2 需要 TLS (h2) 或 HTTP/2 Prior Knowledge
+tls:
+  # 是否启用 TLS
+  enabled: false
+  # 证书文件路径
+  cert_path: "/path/to/cert.pem"
+  # 私钥文件路径
+  key_path: "/path/to/key.pem"
+  # 最小 TLS 版本 (v12 | v13)
+  min_version: "v13"
+  # 支持的密码套件
+  cipher_suites:
+    - "TLS_AES_256_GCM_SHA384"
+    - "TLS_CHACHA20_POLY1305_SHA256"
+    - "TLS_AES_128_GCM_SHA256"
+  # 客户端证书验证 (none | optional | required)
+  client_auth: "none"
+
+# HTTP/2 客户端配置 (用于代理上游请求)
+http2_client:
+  # 是否启用 HTTP/2 客户端
+  enabled: true
+  # 连接池大小
+  pool_size: 16
+  # 连接超时 (秒)
+  connect_timeout_secs: 10
+  # 请求超时 (秒)
+  request_timeout_secs: 300
+  # 连接池 Keep-alive 超时 (秒)
+  pool_keep_alive_secs: 90
+  # 最大空闲连接数
+  max_idle_connections: 32
+  # TCP Keep-alive 间隔 (秒)
+  tcp_keepalive_secs: 60
+  # 启用 TCP_NODELAY
+  tcp_nodelay: true
+  # HTTP/2 初始流窗口大小
+  initial_stream_window_size: 65535
+  # HTTP/2 最大并发流
+  max_concurrent_streams: 100
+  # 自动协商协议 (HTTP/2 或 HTTP/1.1)
+  auto_negotiate: true

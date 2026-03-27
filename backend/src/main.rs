@@ -1,6 +1,7 @@
 //! 应用入口
 
 use anyhow::Result;
+use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
@@ -8,6 +9,7 @@ mod db;
 mod entity;
 mod gateway;
 mod handler;
+mod health;
 mod model;
 mod service;
 mod utils;
@@ -45,12 +47,35 @@ async fn main() -> Result<()> {
     db::run_migrations(&db).await?;
     tracing::info!("Migrations completed");
 
+    // 创建健康检查器
+    let health_checker = Arc::new(health::HealthChecker::new()
+        .with_timeout(std::time::Duration::from_secs(5))
+        .with_retries(3));
+    
+    // 注册健康检查
+    health_checker.register(Box::new(
+        health::PostgresHealthCheck::new(db.sqlx.clone())
+    )).await;
+    
+    health_checker.register(Box::new(
+        health::RedisHealthCheck::new(redis.clone())
+    )).await;
+    
+    health_checker.register(Box::new(
+        health::SystemResourceHealthCheck::new()
+            .with_cpu_threshold(90.0)
+            .with_memory_threshold(90.0)
+            .with_disk_threshold(90.0)
+    )).await;
+    
+    tracing::info!("Health checker initialized with {} checks", health_checker.check_names().await.len());
+
     // 构建应用
     let app = gateway::build_app(gateway::AppState {
         db: db.clone(),
         redis: redis.clone(),
         config: config.clone(),
-    });
+    }, health_checker);
 
     // 启动服务器
     let addr = format!("{}:{}", config.server.host, config.server.port);
@@ -58,6 +83,7 @@ async fn main() -> Result<()> {
     
     tracing::info!("🦊 FoxNIO listening on {}", addr);
     tracing::info!("API: http://{}/v1/models", addr);
+    tracing::info!("Health: http://{}/health", addr);
     tracing::info!("Admin: http://{}/api/v1/admin/users", addr);
     
     axum::serve(listener, app).await?;

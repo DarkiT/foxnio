@@ -13,8 +13,14 @@ axum = { version = "0.7", features = ["macros", "ws"] }
 axum-extra = { version = "0.9", features = ["typed-header", "cookie"] }
 tower = { version = "0.4", features = ["full"] }
 tower-http = { version = "0.5", features = ["full"] }
-hyper = { version = "1.2", features = ["full"] }
+hyper = { version = "1.2", features = ["full", "http2"] }
+hyper-util = { version = "0.1", features = ["full", "http2"] }
 tokio = { version = "1.36", features = ["full"] }
+
+# HTTP/2 & TLS support
+tokio-rustls = "0.26"
+rustls-pemfile = "2.0"
+rustls = "0.23"
 
 # Database
 sea-orm = { version = "0.12", features = ["sqlx-postgres", "runtime-tokio-native-tls", "macros"] }
@@ -22,6 +28,7 @@ sea-orm-migration = "0.12"
 
 # Redis
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+lru = "0.12"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -58,8 +65,17 @@ hex = "0.4"
 sha2 = "0.10"
 hmac = "0.2"
 
+# Compression
+flate2 = "1.0"
+brotli = "3.3"
+bytes = "1.5"
+pin-project-lite = "0.2"
+
 # Configuration
 dotenvy = "0.15"
+
+# System (for health checks)
+nix = { version = "0.27", features = ["fs"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
