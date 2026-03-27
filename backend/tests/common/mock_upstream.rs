@@ -55,7 +55,7 @@ impl MockUpstream {
     /// 启动服务器
     pub async fn start(&mut self) {
         let state = self.state.clone();
-        
+
         let app = Router::new()
             .route("/v1/chat/completions", post(Self::handle_chat_completions))
             .route("/v1/models", get(Self::handle_list_models))
@@ -129,7 +129,7 @@ impl MockUpstream {
         _req: Request<Body>,
     ) -> Result<Json<serde_json::Value>, StatusCode> {
         let state = state.read().await;
-        
+
         if state.delay_ms > 0 {
             tokio::time::sleep(tokio::time::Duration::from_millis(state.delay_ms)).await;
         }
@@ -163,7 +163,7 @@ impl MockUpstream {
         axum::extract::State(state): axum::extract::State<Arc<RwLock<MockServerState>>>,
     ) -> Result<Json<serde_json::Value>, StatusCode> {
         let state = state.read().await;
-        
+
         if state.should_fail {
             return Err(state.response_status);
         }
@@ -199,7 +199,7 @@ mod tests {
     async fn test_mock_server_start_stop() {
         let mut server = MockUpstream::new(18080);
         server.start().await;
-        
+
         // 测试健康检查
         let client = reqwest::Client::new();
         let resp = client
@@ -207,9 +207,9 @@ mod tests {
             .send()
             .await
             .unwrap();
-        
+
         assert_eq!(resp.status(), StatusCode::OK);
-        
+
         server.stop().await;
     }
 
@@ -217,7 +217,7 @@ mod tests {
     async fn test_mock_server_chat_completions() {
         let mut server = MockUpstream::new(18081);
         server.start().await;
-        
+
         let client = reqwest::Client::new();
         let resp = client
             .post(&format!("{}/v1/chat/completions", server.url()))
@@ -228,12 +228,12 @@ mod tests {
             .send()
             .await
             .unwrap();
-        
+
         assert_eq!(resp.status(), StatusCode::OK);
-        
+
         let body: serde_json::Value = resp.json().await.unwrap();
         assert_eq!(body["object"], "chat.completion");
-        
+
         server.stop().await;
     }
 
@@ -242,7 +242,7 @@ mod tests {
         let mut server = MockUpstream::new(18082);
         server.start().await;
         server.set_should_fail(true).await;
-        
+
         let client = reqwest::Client::new();
         let resp = client
             .post(&format!("{}/v1/chat/completions", server.url()))
@@ -250,9 +250,9 @@ mod tests {
             .send()
             .await
             .unwrap();
-        
+
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        
+
         server.stop().await;
     }
 }

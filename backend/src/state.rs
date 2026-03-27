@@ -1,9 +1,9 @@
 //! 应用状态
 
-use std::sync::Arc;
-use crate::db::RedisPool;
 use crate::config::Config;
+use crate::db::RedisPool;
 use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 
 /// 应用状态
 #[derive(Clone)]

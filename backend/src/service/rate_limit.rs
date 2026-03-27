@@ -98,7 +98,9 @@ impl RedisRateLimiter {
 
         // 如果是第一次访问，设置过期时间
         if new_count == 1 {
-            let _: () = conn.expire(&redis_key, self.config.window_seconds as i64).await?;
+            let _: () = conn
+                .expire(&redis_key, self.config.window_seconds as i64)
+                .await?;
         }
 
         Ok(RateLimitResult {

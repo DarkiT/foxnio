@@ -133,7 +133,7 @@ impl CredentialService {
 
         let now = Utc::now();
         let id = Uuid::new_v4();
-        
+
         // 先计算 expires_at，避免部分移动问题
         let expires_at = create.calculate_expires_at();
 

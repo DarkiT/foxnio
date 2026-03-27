@@ -98,14 +98,14 @@ where
 {
     let start = std::time::Instant::now();
     let timeout = std::time::Duration::from_millis(timeout_ms);
-    
+
     while start.elapsed() < timeout {
         if condition().await {
             return;
         }
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
-    
+
     panic!("Timeout waiting for condition");
 }
 
@@ -114,7 +114,7 @@ pub fn random_string(length: usize) -> String {
     use rand::Rng;
     const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let mut rng = rand::thread_rng();
-    
+
     (0..length)
         .map(|_| {
             let idx = rng.gen_range(0..CHARSET.len());
@@ -179,10 +179,10 @@ mod tests {
     fn test_test_helpers() {
         let user_id = test_user_id();
         assert!(!user_id.is_nil());
-        
+
         let email = test_email();
         assert!(email.contains('@'));
-        
+
         let password = test_password();
         assert!(password.len() >= 8);
     }
@@ -191,13 +191,13 @@ mod tests {
     async fn test_wait_for_success() {
         let counter = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
         let counter_clone = counter.clone();
-        
+
         // 在另一个任务中增加计数器
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             counter_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         });
-        
+
         // 等待条件满足
         wait_for(
             || {
@@ -207,7 +207,7 @@ mod tests {
             1000,
         )
         .await;
-        
+
         assert!(counter.load(std::sync::atomic::Ordering::SeqCst) > 0);
     }
 }

@@ -10,8 +10,8 @@ use axum::{extract::State, http::StatusCode, Json};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::health::{AggregateHealthStatus, HealthChecker};
 use crate::gateway::SharedState;
+use crate::health::{AggregateHealthStatus, HealthChecker};
 
 /// 简单健康状态
 pub async fn health_simple(State(checker): State<Arc<HealthChecker>>) -> Json<serde_json::Value> {
@@ -108,7 +108,7 @@ pub async fn health_resources(
 pub async fn health_database(State(checker): State<Arc<HealthChecker>>) -> Json<serde_json::Value> {
     // 使用 HealthChecker 进行简单的健康检查
     let status = checker.check_all().await;
-    
+
     Json(json!({
         "status": if status.healthy { "active" } else { "unhealthy" },
         "message": "Database health check",
@@ -120,7 +120,7 @@ pub async fn health_database(State(checker): State<Arc<HealthChecker>>) -> Json<
 pub async fn health_redis(State(checker): State<Arc<HealthChecker>>) -> Json<serde_json::Value> {
     // 使用 HealthChecker 进行简单的健康检查
     let status = checker.check_all().await;
-    
+
     Json(json!({
         "status": if status.healthy { "active" } else { "unhealthy" },
         "message": "Redis health check",

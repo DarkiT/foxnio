@@ -228,25 +228,23 @@ pub async fn login(
             refresh_token,
             access_token_expires_in,
             refresh_token_expires_in,
-        } => {
-            Ok(Json(AuthResponse {
-                access_token: Some(access_token),
-                refresh_token: Some(refresh_token),
-                token_type: "Bearer".to_string(),
-                expires_in: Some(access_token_expires_in),
-                refresh_expires_in: Some(refresh_token_expires_in),
-                user: Some(UserInfo {
-                    id: user.id.to_string(),
-                    email: user.email,
-                    role: user.role,
-                    status: user.status,
-                    balance: user.balance,
-                }),
-                temp_token: None,
-                requires_totp: None,
-                message: None,
-            }))
-        }
+        } => Ok(Json(AuthResponse {
+            access_token: Some(access_token),
+            refresh_token: Some(refresh_token),
+            token_type: "Bearer".to_string(),
+            expires_in: Some(access_token_expires_in),
+            refresh_expires_in: Some(refresh_token_expires_in),
+            user: Some(UserInfo {
+                id: user.id.to_string(),
+                email: user.email,
+                role: user.role,
+                status: user.status,
+                balance: user.balance,
+            }),
+            temp_token: None,
+            requires_totp: None,
+            message: None,
+        })),
         crate::service::user::LoginResponse::RequiresTotp {
             temp_token,
             expires_in,

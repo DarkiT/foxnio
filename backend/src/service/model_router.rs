@@ -8,8 +8,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::gateway::models::{
-    get_model_config, get_model_info, list_all_models, list_models_by_provider, resolve_model_alias,
-    Model, ModelConfig, ModelInfo, ModelProvider, ProviderConfig,
+    get_model_config, get_model_info, list_all_models, list_models_by_provider,
+    resolve_model_alias, Model, ModelConfig, ModelInfo, ModelProvider, ProviderConfig,
 };
 
 /// 模型路由器

@@ -72,10 +72,7 @@ async fn main() -> Result<()> {
     let redis_config = db::redis::RedisConfig {
         url: format!(
             "redis://:{}@{}:{}/{}",
-            config.redis.password,
-            config.redis.host,
-            config.redis.port,
-            config.redis.db
+            config.redis.password, config.redis.host, config.redis.port, config.redis.db
         ),
         ..Default::default()
     };
@@ -93,7 +90,9 @@ async fn main() -> Result<()> {
 
     // 注册健康检查
     health_checker
-        .register(Box::new(health::PostgresHealthCheck::new(db_pool.sqlx.clone())))
+        .register(Box::new(health::PostgresHealthCheck::new(
+            db_pool.sqlx.clone(),
+        )))
         .await;
 
     health_checker

@@ -155,26 +155,29 @@ impl AlertChannel for EmailChannel {
         };
 
         // 创建 SMTP 传输
-        let transport_result: Result<AsyncSmtpTransport<Tokio1Executor>, String> = if self.config.use_tls {
-            AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&self.config.smtp_host)
-                .map(|t| {
-                    t.credentials(lettre::transport::smtp::authentication::Credentials::new(
-                        self.config.smtp_user.clone(),
-                        self.config.smtp_password.clone(),
-                    ))
-                    .port(self.config.smtp_port)
-                    .build()
-                })
-                .map_err(|e| format!("SMTP relay error: {}", e))
-        } else {
-            Ok(AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&self.config.smtp_host)
-                .credentials(lettre::transport::smtp::authentication::Credentials::new(
-                    self.config.smtp_user.clone(),
-                    self.config.smtp_password.clone(),
-                ))
-                .port(self.config.smtp_port)
-                .build())
-        };
+        let transport_result: Result<AsyncSmtpTransport<Tokio1Executor>, String> =
+            if self.config.use_tls {
+                AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&self.config.smtp_host)
+                    .map(|t| {
+                        t.credentials(lettre::transport::smtp::authentication::Credentials::new(
+                            self.config.smtp_user.clone(),
+                            self.config.smtp_password.clone(),
+                        ))
+                        .port(self.config.smtp_port)
+                        .build()
+                    })
+                    .map_err(|e| format!("SMTP relay error: {}", e))
+            } else {
+                Ok(
+                    AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&self.config.smtp_host)
+                        .credentials(lettre::transport::smtp::authentication::Credentials::new(
+                            self.config.smtp_user.clone(),
+                            self.config.smtp_password.clone(),
+                        ))
+                        .port(self.config.smtp_port)
+                        .build(),
+                )
+            };
 
         let transport = match transport_result {
             Ok(t) => t,

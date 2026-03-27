@@ -89,7 +89,9 @@ pub async fn audit_middleware(
 
     // 读取请求体（如果需要）
     let request_data = if audit_config.log_request_body && is_sensitive {
-        let body_bytes = axum::body::to_bytes(std::mem::take(req.body_mut()), 1024 * 1024).await.ok();
+        let body_bytes = axum::body::to_bytes(std::mem::take(req.body_mut()), 1024 * 1024)
+            .await
+            .ok();
         body_bytes.and_then(|b| serde_json::from_slice(&b).ok())
     } else {
         None

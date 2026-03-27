@@ -3,9 +3,9 @@
 use anyhow::Result;
 use chrono::Utc;
 use rand::Rng;
-use sea_orm::{ModelTrait, QueryOrder,
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QuerySelect, Set,
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use uuid::Uuid;
 

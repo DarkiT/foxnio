@@ -2,9 +2,9 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sea_orm::{QueryOrder,
+use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QuerySelect, Set,
+    QueryOrder, QuerySelect, Set,
 };
 use serde_json::json;
 use uuid::Uuid;

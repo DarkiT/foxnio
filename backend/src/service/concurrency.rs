@@ -3,7 +3,7 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, Semaphore, OwnedSemaphorePermit};
+use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore};
 
 /// 并发限制配置
 #[derive(Debug, Clone)]

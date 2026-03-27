@@ -13,9 +13,9 @@ use argon2::{
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use sea_orm::{QueryOrder,
+use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QuerySelect, Set,
+    QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -818,8 +818,8 @@ impl UserService {
 
     /// 验证密码
     fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
-        let parsed_hash = PasswordHash::new(hash)
-            .map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
+        let parsed_hash =
+            PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Invalid password hash: {}", e))?;
         let argon2 = Argon2::default();
         Ok(argon2
             .verify_password(password.as_bytes(), &parsed_hash)

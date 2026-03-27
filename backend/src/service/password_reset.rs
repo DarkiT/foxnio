@@ -146,7 +146,7 @@ impl<E: EmailSender> PasswordResetService<E> {
 
         // 更新密码
         let password_hash = self.hash_password(new_password)?;
-        
+
         // 保存 email 用于日志
         let user_email = user.email.clone();
 
@@ -160,10 +160,7 @@ impl<E: EmailSender> PasswordResetService<E> {
         reset_token.used_at = Set(Some(Utc::now()));
         reset_token.update(&self.db).await?;
 
-        tracing::info!(
-            "Password reset successful for user: {}",
-            user_email
-        );
+        tracing::info!("Password reset successful for user: {}", user_email);
 
         Ok(())
     }
