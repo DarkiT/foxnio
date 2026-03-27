@@ -9,6 +9,8 @@ pub mod routes;
 pub mod handler;
 pub mod failover;
 pub mod claude;
+pub mod scheduler;
+pub mod models;
 
 pub use proxy::*;
 pub use stream::*;
@@ -17,6 +19,12 @@ pub use routes::build_app;
 pub use handler::GatewayHandler;
 pub use failover::FailoverManager;
 pub use claude::{ClaudeHeaders, TLSFingerprint, get_beta_header};
+pub use scheduler::{
+    ScheduleStrategy, Scheduler, SchedulerConfig, AccountInfo, AccountStatus,
+    ScheduleContext, ScheduleResult, SchedulerStats,
+    SchedulerMetrics, AccountMetrics,
+    CostOptimizer, CostConfig, BudgetSummary,
+};
 
 use sea_orm::DatabaseConnection;
 use redis::aio::ConnectionManager;
