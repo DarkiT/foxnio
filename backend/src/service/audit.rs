@@ -5,8 +5,8 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, PaginatorTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -262,7 +262,12 @@ impl AuditService {
     }
 
     /// 查询用户的审计日志
-    pub async fn get_user_logs(&self, user_id: Uuid, page: u64, page_size: u64) -> Result<Vec<audit_logs::Model>> {
+    pub async fn get_user_logs(
+        &self,
+        user_id: Uuid,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<audit_logs::Model>> {
         let page_size = page_size.min(100);
 
         let logs = audit_logs::Entity::find()
@@ -300,7 +305,11 @@ impl AuditService {
     }
 
     /// 获取敏感操作日志
-    pub async fn get_sensitive_logs(&self, page: u64, page_size: u64) -> Result<Vec<audit_logs::Model>> {
+    pub async fn get_sensitive_logs(
+        &self,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<audit_logs::Model>> {
         let sensitive_actions = [
             AuditAction::UserLogin.as_str(),
             AuditAction::PasswordChange.as_str(),
@@ -323,7 +332,7 @@ impl AuditService {
     /// 清理过期的审计日志
     pub async fn cleanup_old_logs(&self, days_to_keep: i64) -> Result<u64> {
         let cutoff = Utc::now() - chrono::Duration::days(days_to_keep);
-        
+
         let result = audit_logs::Entity::delete_many()
             .filter(audit_logs::Column::CreatedAt.lt(cutoff))
             .exec(&self.db)
@@ -371,7 +380,7 @@ mod tests {
     fn test_audit_entry_creation() {
         let user_id = Uuid::new_v4();
         let entry = AuditEntry::user_login(user_id, Some("192.168.1.1".to_string()), None);
-        
+
         assert_eq!(entry.user_id, Some(user_id));
         assert_eq!(entry.action, "USER_LOGIN");
         assert_eq!(entry.resource_type, Some("user".to_string()));

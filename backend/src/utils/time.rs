@@ -1,6 +1,6 @@
 //! 时间工具
 
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 获取当前时间戳（毫秒）
@@ -58,55 +58,63 @@ pub fn is_expired(expires_at: DateTime<Utc>) -> bool {
 
 /// 获取今天开始时间
 pub fn today_start() -> DateTime<Utc> {
-    Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc()
+    Utc::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc()
 }
 
 /// 获取今天结束时间
 pub fn today_end() -> DateTime<Utc> {
-    Utc::now().date_naive().and_hms_opt(23, 59, 59).unwrap().and_utc()
+    Utc::now()
+        .date_naive()
+        .and_hms_opt(23, 59, 59)
+        .unwrap()
+        .and_utc()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_current_timestamp() {
         let ts = current_timestamp();
         assert!(ts > 0);
     }
-    
+
     #[test]
     fn test_timestamp_conversion() {
         let now = Utc::now();
         let ts = datetime_to_timestamp(now);
         let dt = timestamp_to_datetime(ts);
-        
+
         assert_eq!(now.timestamp_millis(), dt.timestamp_millis());
     }
-    
+
     #[test]
     fn test_format_datetime() {
         let dt = Utc::now();
         let formatted = format_datetime(dt);
-        
+
         assert!(formatted.contains("UTC"));
     }
-    
+
     #[test]
     fn test_is_expired() {
         let past = Utc::now() - chrono::Duration::hours(1);
         let future = Utc::now() + chrono::Duration::hours(1);
-        
+
         assert!(is_expired(past));
         assert!(!is_expired(future));
     }
-    
+
     #[test]
     fn test_duration() {
         let start = Utc::now();
         let end = start + chrono::Duration::seconds(60);
-        
+
         let secs = duration_seconds(start, end);
         assert_eq!(secs, 60);
     }

@@ -6,23 +6,17 @@
 //! - GET /health/ready - 就绪探针
 //! - GET /health/detailed - 详细状态
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, Json};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::health::{HealthChecker, AggregateHealthStatus};
+use crate::health::{AggregateHealthStatus, HealthChecker};
 use crate::state::SharedState;
 
 /// 简单健康状态
-pub async fn health_simple(
-    State(checker): State<Arc<HealthChecker>>,
-) -> Json<serde_json::Value> {
+pub async fn health_simple(State(checker): State<Arc<HealthChecker>>) -> Json<serde_json::Value> {
     let status = checker.check_critical().await;
-    
+
     let (status_str, code) = if status.healthy {
         ("healthy", StatusCode::OK)
     } else {
@@ -52,7 +46,7 @@ pub async fn health_ready(
     State(checker): State<Arc<HealthChecker>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let status = checker.check_critical().await;
-    
+
     if status.healthy {
         Ok(Json(json!({
             "status": "ready",
@@ -111,11 +105,9 @@ pub async fn health_resources(
 }
 
 /// 数据库连接池状态
-pub async fn health_database(
-    State(state): State<SharedState>,
-) -> Json<serde_json::Value> {
+pub async fn health_database(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let pool_status = state.db.pool_status();
-    
+
     Json(json!({
         "status": if pool_status.is_closed { "closed" } else { "active" },
         "pool_size": pool_status.size,
@@ -128,11 +120,9 @@ pub async fn health_database(
 }
 
 /// Redis 状态
-pub async fn health_redis(
-    State(state): State<SharedState>,
-) -> Json<serde_json::Value> {
+pub async fn health_redis(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let stats = state.redis.get_stats();
-    
+
     Json(json!({
         "status": "active",
         "cache_hit_rate": format!("{:.1}%", stats.cache_hit_rate() * 100.0),
@@ -158,12 +148,10 @@ pub async fn app_info() -> Json<serde_json::Value> {
 }
 
 /// 应用指标
-pub async fn metrics(
-    State(state): State<SharedState>,
-) -> Json<serde_json::Value> {
+pub async fn metrics(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let db_status = state.db.pool_status();
     let redis_stats = state.redis.get_stats();
-    
+
     Json(json!({
         "database": {
             "pool_size": db_status.size,
@@ -191,21 +179,20 @@ pub async fn metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{
-        body::Body,
-        http::Request,
-        routing::get,
-        Router,
-    };
+    use axum::{body::Body, http::Request, routing::get, Router};
     use tower::ServiceExt;
 
     #[tokio::test]
     async fn test_health_live() {
-        let app = Router::new()
-            .route("/health/live", get(health_live));
+        let app = Router::new().route("/health/live", get(health_live));
 
         let response = app
-            .oneshot(Request::builder().uri("/health/live").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health/live")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -214,8 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_app_info() {
-        let app = Router::new()
-            .route("/info", get(app_info));
+        let app = Router::new().route("/info", get(app_info));
 
         let response = app
             .oneshot(Request::builder().uri("/info").body(Body::empty()).unwrap())
@@ -223,10 +209,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        
+
         assert_eq!(json["name"], "FoxNIO");
     }
 }

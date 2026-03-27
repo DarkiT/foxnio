@@ -1,9 +1,9 @@
 //! OAuth 讈权服务
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
+use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 
 /// OAuth 提供商
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ impl OAuthService {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
-        
+
         Self {
             client,
             anthropic_client_id: None,
@@ -59,32 +59,39 @@ impl OAuthService {
             gemini_client_secret: None,
         }
     }
-    
+
     pub fn with_anthropic(mut self, client_id: String, client_secret: String) -> Self {
         self.anthropic_client_id = Some(client_id);
         self.anthropic_client_secret = Some(client_secret);
         self
     }
-    
+
     pub fn with_openai(mut self, client_id: String, client_secret: String) -> Self {
         self.openai_client_id = Some(client_id);
         self.openai_client_secret = Some(client_secret);
         self
     }
-    
+
     pub fn with_gemini(mut self, client_id: String, client_secret: String) -> Self {
         self.gemini_client_id = Some(client_id);
         self.gemini_client_secret = Some(client_secret);
         self
     }
-    
+
     /// 获取授权 URL
-    pub fn get_authorization_url(&self, provider: &OAuthProvider, redirect_uri: &str, state: &str) -> Result<String> {
+    pub fn get_authorization_url(
+        &self,
+        provider: &OAuthProvider,
+        redirect_uri: &str,
+        state: &str,
+    ) -> Result<String> {
         match provider {
             OAuthProvider::Anthropic => {
-                let client_id = self.anthropic_client_id.as_ref()
+                let client_id = self
+                    .anthropic_client_id
+                    .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("Anthropic OAuth not configured"))?;
-                
+
                 Ok(format!(
                     "https://claude.ai/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&state={}",
                     client_id,
@@ -93,9 +100,11 @@ impl OAuthService {
                 ))
             }
             OAuthProvider::OpenAI => {
-                let client_id = self.openai_client_id.as_ref()
+                let client_id = self
+                    .openai_client_id
+                    .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("OpenAI OAuth not configured"))?;
-                
+
                 Ok(format!(
                     "https://auth.openai.com/authorize?client_id={}&redirect_uri={}&response_type=code&scope=openid+profile+email&state={}",
                     client_id,
@@ -104,9 +113,11 @@ impl OAuthService {
                 ))
             }
             OAuthProvider::Gemini => {
-                let client_id = self.gemini_client_id.as_ref()
+                let client_id = self
+                    .gemini_client_id
+                    .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("Gemini OAuth not configured"))?;
-                
+
                 Ok(format!(
                     "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=https://www.googleapis.com/auth/generative-language&state={}",
                     client_id,
@@ -116,23 +127,33 @@ impl OAuthService {
             }
         }
     }
-    
+
     /// 用授权码换取 Token
-    pub async fn exchange_code(&self, provider: &OAuthProvider, code: &str, redirect_uri: &str) -> Result<OAuthToken> {
+    pub async fn exchange_code(
+        &self,
+        provider: &OAuthProvider,
+        code: &str,
+        redirect_uri: &str,
+    ) -> Result<OAuthToken> {
         match provider {
             OAuthProvider::Anthropic => self.exchange_anthropic_code(code, redirect_uri).await,
             OAuthProvider::OpenAI => self.exchange_openai_code(code, redirect_uri).await,
             OAuthProvider::Gemini => self.exchange_gemini_code(code, redirect_uri).await,
         }
     }
-    
+
     async fn exchange_anthropic_code(&self, code: &str, redirect_uri: &str) -> Result<OAuthToken> {
-        let client_id = self.anthropic_client_id.as_ref()
+        let client_id = self
+            .anthropic_client_id
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Anthropic OAuth not configured"))?;
-        let client_secret = self.anthropic_client_secret.as_ref()
+        let client_secret = self
+            .anthropic_client_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Anthropic OAuth not configured"))?;
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post("https://claude.ai/oauth/token")
             .form(&[
                 ("grant_type", "authorization_code"),
@@ -143,13 +164,13 @@ impl OAuthService {
             ])
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             bail!("Failed to exchange Anthropic code: {}", response.status());
         }
-        
+
         let token: OAuthTokenResponse = response.json().await?;
-        
+
         Ok(OAuthToken {
             access_token: token.access_token,
             refresh_token: token.refresh_token,
@@ -158,14 +179,19 @@ impl OAuthService {
             created_at: Utc::now(),
         })
     }
-    
+
     async fn exchange_openai_code(&self, code: &str, redirect_uri: &str) -> Result<OAuthToken> {
-        let client_id = self.openai_client_id.as_ref()
+        let client_id = self
+            .openai_client_id
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("OpenAI OAuth not configured"))?;
-        let client_secret = self.openai_client_secret.as_ref()
+        let client_secret = self
+            .openai_client_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("OpenAI OAuth not configured"))?;
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post("https://auth.openai.com/oauth/token")
             .form(&[
                 ("grant_type", "authorization_code"),
@@ -176,13 +202,13 @@ impl OAuthService {
             ])
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             bail!("Failed to exchange OpenAI code: {}", response.status());
         }
-        
+
         let token: OAuthTokenResponse = response.json().await?;
-        
+
         Ok(OAuthToken {
             access_token: token.access_token,
             refresh_token: token.refresh_token,
@@ -191,14 +217,19 @@ impl OAuthService {
             created_at: Utc::now(),
         })
     }
-    
+
     async fn exchange_gemini_code(&self, code: &str, redirect_uri: &str) -> Result<OAuthToken> {
-        let client_id = self.gemini_client_id.as_ref()
+        let client_id = self
+            .gemini_client_id
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Gemini OAuth not configured"))?;
-        let client_secret = self.gemini_client_secret.as_ref()
+        let client_secret = self
+            .gemini_client_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Gemini OAuth not configured"))?;
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post("https://oauth2.googleapis.com/token")
             .form(&[
                 ("grant_type", "authorization_code"),
@@ -209,13 +240,13 @@ impl OAuthService {
             ])
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             bail!("Failed to exchange Gemini code: {}", response.status());
         }
-        
+
         let token: OAuthTokenResponse = response.json().await?;
-        
+
         Ok(OAuthToken {
             access_token: token.access_token,
             refresh_token: token.refresh_token,
@@ -224,33 +255,42 @@ impl OAuthService {
             created_at: Utc::now(),
         })
     }
-    
+
     /// 刷新 Token
-    pub async fn refresh_token(&self, provider: &OAuthProvider, refresh_token: &str) -> Result<OAuthToken> {
+    pub async fn refresh_token(
+        &self,
+        provider: &OAuthProvider,
+        refresh_token: &str,
+    ) -> Result<OAuthToken> {
         match provider {
             OAuthProvider::Anthropic => self.refresh_anthropic_token(refresh_token).await,
             OAuthProvider::OpenAI => self.refresh_openai_token(refresh_token).await,
             OAuthProvider::Gemini => self.refresh_gemini_token(refresh_token).await,
         }
     }
-    
+
     async fn refresh_anthropic_token(&self, _refresh_token: &str) -> Result<OAuthToken> {
         // TODO: 实现 Anthropic token 刷新
         bail!("Anthropic token refresh not implemented")
     }
-    
+
     async fn refresh_openai_token(&self, _refresh_token: &str) -> Result<OAuthToken> {
         // TODO: 实现 OpenAI token 刷新
         bail!("OpenAI token refresh not implemented")
     }
-    
+
     async fn refresh_gemini_token(&self, refresh_token: &str) -> Result<OAuthToken> {
-        let client_id = self.gemini_client_id.as_ref()
+        let client_id = self
+            .gemini_client_id
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Gemini OAuth not configured"))?;
-        let client_secret = self.gemini_client_secret.as_ref()
+        let client_secret = self
+            .gemini_client_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Gemini OAuth not configured"))?;
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post("https://oauth2.googleapis.com/token")
             .form(&[
                 ("grant_type", "refresh_token"),
@@ -260,13 +300,13 @@ impl OAuthService {
             ])
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             bail!("Failed to refresh Gemini token: {}", response.status());
         }
-        
+
         let token: OAuthTokenResponse = response.json().await?;
-        
+
         Ok(OAuthToken {
             access_token: token.access_token,
             refresh_token: Some(refresh_token.to_string()),
@@ -294,7 +334,7 @@ impl Default for OAuthService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_oauth_token_expiry() {
         let token = OAuthToken {
@@ -304,11 +344,11 @@ mod tests {
             token_type: "Bearer".to_string(),
             created_at: Utc::now(),
         };
-        
+
         // Token 刚创建，不应该过期
         assert!(!token.is_expired());
     }
-    
+
     #[test]
     fn test_oauth_token_expired() {
         let token = OAuthToken {
@@ -318,10 +358,10 @@ mod tests {
             token_type: "Bearer".to_string(),
             created_at: Utc::now(),
         };
-        
+
         assert!(token.is_expired());
     }
-    
+
     #[test]
     fn test_oauth_provider() {
         let providers = vec![
@@ -329,10 +369,10 @@ mod tests {
             OAuthProvider::OpenAI,
             OAuthProvider::Gemini,
         ];
-        
+
         assert_eq!(providers.len(), 3);
     }
-    
+
     #[test]
     fn test_oauth_service_creation() {
         let service = OAuthService::new();
@@ -340,14 +380,14 @@ mod tests {
         assert!(service.openai_client_id.is_none());
         assert!(service.gemini_client_id.is_none());
     }
-    
+
     #[test]
     fn test_oauth_service_with_config() {
         let service = OAuthService::new()
             .with_anthropic("anthropic_id".to_string(), "anthropic_secret".to_string())
             .with_openai("openai_id".to_string(), "openai_secret".to_string())
             .with_gemini("gemini_id".to_string(), "gemini_secret".to_string());
-        
+
         assert!(service.anthropic_client_id.is_some());
         assert!(service.openai_client_id.is_some());
         assert!(service.gemini_client_id.is_some());

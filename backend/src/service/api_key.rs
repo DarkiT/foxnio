@@ -1,13 +1,13 @@
 //! API Key 服务 - 完整实现
 
 use anyhow::Result;
+use chrono::Utc;
+use rand::Rng;
 use sea_orm::{
-    EntityTrait, QueryFilter, ColumnTrait, ActiveModelTrait, Set, 
-    DatabaseConnection, ActiveValue, QuerySelect, PaginatorTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QuerySelect, Set,
 };
 use uuid::Uuid;
-use rand::Rng;
-use chrono::Utc;
 
 use crate::entity::{api_keys, users};
 
@@ -42,7 +42,7 @@ impl ApiKeyService {
                 chars.chars().nth(idx).unwrap()
             })
             .collect();
-        
+
         format!("{}{}", self.key_prefix, random_part)
     }
 
@@ -56,7 +56,7 @@ impl ApiKeyService {
 
         let key = self.generate_key();
         let now = Utc::now();
-        
+
         let api_key = api_keys::ActiveModel {
             id: Set(Uuid::new_v4()),
             user_id: Set(user_id),
@@ -132,15 +132,18 @@ impl ApiKeyService {
             .all(&self.db)
             .await?;
 
-        Ok(keys.into_iter().map(|k| ApiKeyInfo {
-            id: k.id,
-            user_id: k.user_id,
-            key_masked: k.mask_key(),
-            name: k.name,
-            status: k.status,
-            created_at: k.created_at,
-            last_used_at: k.last_used_at,
-        }).collect())
+        Ok(keys
+            .into_iter()
+            .map(|k| ApiKeyInfo {
+                id: k.id,
+                user_id: k.user_id,
+                key_masked: k.mask_key(),
+                name: k.name,
+                status: k.status,
+                created_at: k.created_at,
+                last_used_at: k.last_used_at,
+            })
+            .collect())
     }
 
     /// 删除 API Key
@@ -163,5 +166,5 @@ fn mask_key(key: &str) -> String {
     if key.len() < 12 {
         return key.to_string();
     }
-    format!("{}...{}", &key[..7], &key[key.len()-4..])
+    format!("{}...{}", &key[..7], &key[key.len() - 4..])
 }

@@ -205,7 +205,10 @@ impl HealthChecker {
                 }
                 Err(_) => {
                     last_error = format!("Timeout after {:?}", self.default_timeout);
-                    warn!("Health check '{}' timed out (attempt {}/{})", name, attempts, self.default_retries);
+                    warn!(
+                        "Health check '{}' timed out (attempt {}/{})",
+                        name, attempts, self.default_retries
+                    );
                 }
             }
 
@@ -288,10 +291,8 @@ impl HealthChecker {
             .filter(|r| r.critical)
             .all(|r| r.status.healthy);
 
-        let checks_map: HashMap<String, CheckResult> = results
-            .into_iter()
-            .map(|r| (r.name.clone(), r))
-            .collect();
+        let checks_map: HashMap<String, CheckResult> =
+            results.into_iter().map(|r| (r.name.clone(), r)).collect();
 
         AggregateHealthStatus {
             healthy,
@@ -379,9 +380,11 @@ impl HealthCheck for PostgresHealthCheck {
                 let pool_size = self.pool.size();
                 let num_idle = self.pool.num_idle();
 
-                Ok(HealthStatus::healthy("PostgreSQL connection is active", latency)
-                    .with_detail("pool_size", pool_size.to_string())
-                    .with_detail("idle_connections", num_idle.to_string()))
+                Ok(
+                    HealthStatus::healthy("PostgreSQL connection is active", latency)
+                        .with_detail("pool_size", pool_size.to_string())
+                        .with_detail("idle_connections", num_idle.to_string()),
+                )
             }
             Ok(Err(e)) => {
                 error!("PostgreSQL health check failed: {}", e);
@@ -461,10 +464,16 @@ impl HealthCheck for RedisHealthCheck {
                     .with_detail("cache_hit_rate", format!("{:.1}%", hit_rate * 100.0))
                     .with_detail("avg_latency_ms", format!("{:.1}", avg_latency)))
             }
-            Ok(Ok(false)) => Ok(HealthStatus::unhealthy("Redis health check returned false", latency)),
+            Ok(Ok(false)) => Ok(HealthStatus::unhealthy(
+                "Redis health check returned false",
+                latency,
+            )),
             Ok(Err(e)) => {
                 error!("Redis health check failed: {}", e);
-                Ok(HealthStatus::unhealthy(format!("Redis error: {}", e), latency))
+                Ok(HealthStatus::unhealthy(
+                    format!("Redis error: {}", e),
+                    latency,
+                ))
             }
             Err(_) => {
                 error!("Redis health check timed out");
@@ -536,9 +545,10 @@ impl SystemResourceHealthCheck {
         {
             // 读取 /proc/stat 获取 CPU 使用率
             let stat = std::fs::read_to_string("/proc/stat")?;
-            let first_line = stat.lines().next().ok_or_else(|| {
-                anyhow::anyhow!("Failed to read /proc/stat")
-            })?;
+            let first_line = stat
+                .lines()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("Failed to read /proc/stat"))?;
 
             let parts: Vec<u64> = first_line
                 .split_whitespace()
@@ -679,7 +689,10 @@ impl HealthCheck for SystemResourceHealthCheck {
         // 内存检查
         match self.get_memory_usage() {
             Ok(mem_usage) => {
-                details.insert("memory_usage_percent".to_string(), format!("{:.1}", mem_usage));
+                details.insert(
+                    "memory_usage_percent".to_string(),
+                    format!("{:.1}", mem_usage),
+                );
                 if mem_usage > self.memory_threshold {
                     warnings.push(format!(
                         "Memory usage {:.1}% exceeds threshold {:.1}%",
@@ -695,7 +708,10 @@ impl HealthCheck for SystemResourceHealthCheck {
         // 磁盘检查
         match self.get_disk_usage() {
             Ok(disk_usage) => {
-                details.insert("disk_usage_percent".to_string(), format!("{:.1}", disk_usage));
+                details.insert(
+                    "disk_usage_percent".to_string(),
+                    format!("{:.1}", disk_usage),
+                );
                 details.insert("disk_path".to_string(), self.disk_path.clone());
                 if disk_usage > self.disk_threshold {
                     warnings.push(format!(

@@ -8,6 +8,9 @@ mod m20240327_000005_create_refresh_tokens;
 mod m20240327_000005_create_password_reset_tokens;
 mod m20240327_000006_create_oauth_tokens;
 mod m20240327_000007_create_audit_logs;
+mod m20240327_000008_create_alert_rules;
+mod m20240327_000009_create_alert_history;
+mod m20240327_000010_create_alert_channels;
 
 pub struct Migrator;
 
@@ -23,6 +26,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20240327_000005_create_password_reset_tokens::Migration),
             Box::new(m20240327_000006_create_oauth_tokens::Migration),
             Box::new(m20240327_000007_create_audit_logs::Migration),
+            Box::new(m20240327_000008_create_alert_rules::Migration),
+            Box::new(m20240327_000009_create_alert_history::Migration),
+            Box::new(m20240327_000010_create_alert_channels::Migration),
         ]
     }
 }

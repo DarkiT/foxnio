@@ -65,6 +65,6 @@ impl Model {
         if self.key.len() < 12 {
             return self.key.clone();
         }
-        format!("{}...{}", &self.key[..7], &self.key[self.key.len()-4..])
+        format!("{}...{}", &self.key[..7], &self.key[self.key.len() - 4..])
     }
 }

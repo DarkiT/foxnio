@@ -13,9 +13,8 @@ struct RedisStore {
 impl RedisStore {
     fn cleanup_expired(&mut self) {
         let now = chrono::Utc::now().timestamp();
-        self.data.retain(|_, (_, exp)| {
-            exp.map(|e| e > now).unwrap_or(true)
-        });
+        self.data
+            .retain(|_, (_, exp)| exp.map(|e| e > now).unwrap_or(true));
     }
 }
 
@@ -112,7 +111,7 @@ mod tests {
     #[tokio::test]
     async fn test_set_and_get() {
         let redis = MockRedisPool::new();
-        
+
         redis.set("key1", "value1", None).await.unwrap();
         let value = redis.get("key1").await.unwrap();
         assert_eq!(value, Some("value1".to_string()));
@@ -121,7 +120,7 @@ mod tests {
     #[tokio::test]
     async fn test_nonexistent_key() {
         let redis = MockRedisPool::new();
-        
+
         let value = redis.get("nonexistent").await.unwrap();
         assert_eq!(value, None);
     }
@@ -129,11 +128,11 @@ mod tests {
     #[tokio::test]
     async fn test_delete() {
         let redis = MockRedisPool::new();
-        
+
         redis.set("key1", "value1", None).await.unwrap();
         let deleted = redis.del("key1").await.unwrap();
         assert!(deleted);
-        
+
         let value = redis.get("key1").await.unwrap();
         assert_eq!(value, None);
     }
@@ -141,7 +140,7 @@ mod tests {
     #[tokio::test]
     async fn test_exists() {
         let redis = MockRedisPool::new();
-        
+
         assert!(!redis.exists("key1").await.unwrap());
         redis.set("key1", "value1", None).await.unwrap();
         assert!(redis.exists("key1").await.unwrap());
@@ -150,11 +149,14 @@ mod tests {
     #[tokio::test]
     async fn test_expiration() {
         let redis = MockRedisPool::new();
-        
+
         // 设置 1 秒过期
-        redis.set("key1", "value1", Some(Duration::from_millis(100))).await.unwrap();
+        redis
+            .set("key1", "value1", Some(Duration::from_millis(100)))
+            .await
+            .unwrap();
         assert!(redis.exists("key1").await.unwrap());
-        
+
         // 等待过期
         tokio::time::sleep(Duration::from_millis(150)).await;
         assert!(!redis.exists("key1").await.unwrap());
@@ -163,10 +165,13 @@ mod tests {
     #[tokio::test]
     async fn test_expire() {
         let redis = MockRedisPool::new();
-        
+
         redis.set("key1", "value1", None).await.unwrap();
-        redis.expire("key1", Duration::from_millis(100)).await.unwrap();
-        
+        redis
+            .expire("key1", Duration::from_millis(100))
+            .await
+            .unwrap();
+
         assert!(redis.exists("key1").await.unwrap());
         tokio::time::sleep(Duration::from_millis(150)).await;
         assert!(!redis.exists("key1").await.unwrap());
@@ -175,18 +180,21 @@ mod tests {
     #[tokio::test]
     async fn test_ttl() {
         let redis = MockRedisPool::new();
-        
+
         // 不存在的键
         let ttl = redis.ttl("nonexistent").await.unwrap();
         assert_eq!(ttl, -2);
-        
+
         // 无过期时间的键
         redis.set("key1", "value1", None).await.unwrap();
         let ttl = redis.ttl("key1").await.unwrap();
         assert_eq!(ttl, -1);
-        
+
         // 有过期时间的键
-        redis.set("key2", "value2", Some(Duration::from_secs(100))).await.unwrap();
+        redis
+            .set("key2", "value2", Some(Duration::from_secs(100)))
+            .await
+            .unwrap();
         let ttl = redis.ttl("key2").await.unwrap();
         assert!(ttl > 90 && ttl <= 100);
     }

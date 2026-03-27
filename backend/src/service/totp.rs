@@ -2,7 +2,7 @@
 //!
 //! 兼容 Google Authenticator / Authy / Microsoft Authenticator
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use base64::Engine;
 use qrcode::QrCode;
 use rand::RngCore;
@@ -33,7 +33,7 @@ impl TotpService {
         // 生成 20 字节的随机密钥（160位，推荐长度）
         let mut bytes = [0u8; 20];
         rand::thread_rng().fill_bytes(&mut bytes);
-        
+
         // Base32 编码（Google Authenticator 标准）
         base32_encode(&bytes)
     }
@@ -43,13 +43,13 @@ impl TotpService {
     pub fn generate_backup_codes() -> Vec<String> {
         let mut codes = Vec::with_capacity(10);
         let mut rng = rand::thread_rng();
-        
+
         for _ in 0..10 {
             let code1 = rng.next_u32() % 10000;
             let code2 = rng.next_u32() % 10000;
             codes.push(format!("{:04}-{:04}", code1, code2));
         }
-        
+
         codes
     }
 
@@ -59,7 +59,8 @@ impl TotpService {
         if parts.len() != 2 {
             return false;
         }
-        parts[0].len() == 4 && parts[1].len() == 4 
+        parts[0].len() == 4
+            && parts[1].len() == 4
             && parts[0].chars().all(|c| c.is_ascii_digit())
             && parts[1].chars().all(|c| c.is_ascii_digit())
     }
@@ -71,26 +72,21 @@ impl TotpService {
         let email_encoded = url_encode(email);
         format!(
             "otpauth://totp/{}:{}?secret={}&issuer={}&algorithm=SHA1&digits={}&period={}",
-            issuer_encoded,
-            email_encoded,
-            secret,
-            issuer_encoded,
-            TOTP_DIGITS,
-            TOTP_PERIOD,
+            issuer_encoded, email_encoded, secret, issuer_encoded, TOTP_DIGITS, TOTP_PERIOD,
         )
     }
 
     /// 生成 QR 码（返回 Base64 编码的 SVG）
     pub fn generate_qr_code_base64(&self, email: &str, secret: &str) -> Result<String> {
         let otpauth_url = self.generate_otpauth_url(email, secret);
-        
+
         // 生成 QR 码
         let code = QrCode::new(otpauth_url.as_bytes())
             .map_err(|e| anyhow::anyhow!("Failed to generate QR code: {}", e))?;
-        
+
         // 转换为 SVG 字符串
         let svg = code.render::<qrcode::render::svg::Color>().build();
-        
+
         // Base64 编码
         Ok(base64::engine::general_purpose::STANDARD.encode(svg.as_bytes()))
     }
@@ -106,7 +102,7 @@ impl TotpService {
     pub fn verify_code(secret: &str, code: &str) -> bool {
         // 清理代码（移除空格）
         let code = code.trim().replace(' ', "");
-        
+
         // 验证格式
         if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
             return false;
@@ -134,14 +130,10 @@ impl TotpService {
                 if window < 0 {
                     continue;
                 }
-                
-                let expected_code = totp_custom::<Sha1>(
-                    TOTP_PERIOD,
-                    TOTP_DIGITS,
-                    &secret_bytes,
-                    window as u64,
-                );
-                
+
+                let expected_code =
+                    totp_custom::<Sha1>(TOTP_PERIOD, TOTP_DIGITS, &secret_bytes, window as u64);
+
                 if expected_code == code {
                     return true;
                 }
@@ -153,8 +145,8 @@ impl TotpService {
 
     /// 获取当前 TOTP 代码（用于测试）
     pub fn get_current_code(secret: &str) -> Result<String> {
-        let secret_bytes = base32_decode(secret)
-            .ok_or_else(|| anyhow::anyhow!("Invalid secret format"))?;
+        let secret_bytes =
+            base32_decode(secret).ok_or_else(|| anyhow::anyhow!("Invalid secret format"))?;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -176,7 +168,7 @@ impl TotpService {
 
     /// 哈希备用码（用于存储）
     pub fn hash_backup_code(code: &str) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(code.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -282,7 +274,9 @@ mod tests {
         let secret = TotpService::generate_secret();
         assert!(!secret.is_empty());
         assert!(secret.len() >= 32); // 至少 32 个字符
-        assert!(secret.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
+        assert!(secret
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
     }
 
     #[test]
@@ -306,7 +300,7 @@ mod tests {
     fn test_otpauth_url() {
         let service = TotpService::new("FoxNIO");
         let url = service.generate_otpauth_url("test@example.com", "JBSWY3DPEHPK3PXP");
-        
+
         assert!(url.starts_with("otpauth://totp/"));
         assert!(url.contains("secret=JBSWY3DPEHPK3PXP"));
         assert!(url.contains("issuer=FoxNIO"));
@@ -337,7 +331,7 @@ mod tests {
         // RFC 6238 测试密钥: "12345678901234567890" (20 bytes)
         // Base32 编码后: "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
         let secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
-        
+
         // 这个测试需要固定时间戳才能精确验证
         // 这里只验证能生成 6 位数字
         let code = TotpService::get_current_code(secret).unwrap();
@@ -357,12 +351,14 @@ mod tests {
         let service = TotpService::new("FoxNIO");
         let result = service.generate_qr_code_base64("test@example.com", "JBSWY3DPEHPK3PXP");
         assert!(result.is_ok());
-        
+
         let base64_svg = result.unwrap();
         assert!(!base64_svg.is_empty());
-        
+
         // 解码并验证是 SVG
-        let decoded = base64::engine::general_purpose::STANDARD.decode(&base64_svg).unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(&base64_svg)
+            .unwrap();
         let svg_str = String::from_utf8(decoded).unwrap();
         assert!(svg_str.starts_with("<?xml") || svg_str.starts_with("<svg"));
     }
@@ -372,7 +368,7 @@ mod tests {
         let service = TotpService::new("FoxNIO");
         let result = service.generate_qr_code_data_url("test@example.com", "JBSWY3DPEHPK3PXP");
         assert!(result.is_ok());
-        
+
         let data_url = result.unwrap();
         assert!(data_url.starts_with("data:image/svg+xml;base64,"));
     }

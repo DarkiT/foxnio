@@ -1,7 +1,7 @@
 //! 加密工具
 
 use anyhow::Result;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 
 /// Base64 编码
 pub fn base64_encode(data: &[u8]) -> String {
@@ -31,7 +31,7 @@ pub fn random_hex(len: usize) -> String {
 pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
-    
+
     let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC initialization failed");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
@@ -39,7 +39,7 @@ pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
 
 /// SHA256 哈希
 pub fn sha256(data: &[u8]) -> Vec<u8> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(data);
     hasher.finalize().to_vec()

@@ -10,20 +10,44 @@ use uuid::Uuid;
 
 #[cfg(test)]
 mod audit_entity_tests {
-    use foxnio::entity::audit_logs::{AuditAction, mask_ip, mask_user_agent};
+    use foxnio::entity::audit_logs::{mask_ip, mask_user_agent, AuditAction};
 
     #[test]
     fn test_audit_action_from_str() {
         // 测试所有预定义的审计动作
-        assert_eq!(AuditAction::from_str("USER_LOGIN"), Some(AuditAction::UserLogin));
-        assert_eq!(AuditAction::from_str("USER_LOGOUT"), Some(AuditAction::UserLogout));
-        assert_eq!(AuditAction::from_str("USER_REGISTER"), Some(AuditAction::UserRegister));
-        assert_eq!(AuditAction::from_str("PASSWORD_CHANGE"), Some(AuditAction::PasswordChange));
-        assert_eq!(AuditAction::from_str("API_KEY_CREATE"), Some(AuditAction::ApiKeyCreate));
-        assert_eq!(AuditAction::from_str("API_KEY_DELETE"), Some(AuditAction::ApiKeyDelete));
-        assert_eq!(AuditAction::from_str("ACCOUNT_UPDATE"), Some(AuditAction::AccountUpdate));
-        assert_eq!(AuditAction::from_str("ADMIN_ACTION"), Some(AuditAction::AdminAction));
-        
+        assert_eq!(
+            AuditAction::from_str("USER_LOGIN"),
+            Some(AuditAction::UserLogin)
+        );
+        assert_eq!(
+            AuditAction::from_str("USER_LOGOUT"),
+            Some(AuditAction::UserLogout)
+        );
+        assert_eq!(
+            AuditAction::from_str("USER_REGISTER"),
+            Some(AuditAction::UserRegister)
+        );
+        assert_eq!(
+            AuditAction::from_str("PASSWORD_CHANGE"),
+            Some(AuditAction::PasswordChange)
+        );
+        assert_eq!(
+            AuditAction::from_str("API_KEY_CREATE"),
+            Some(AuditAction::ApiKeyCreate)
+        );
+        assert_eq!(
+            AuditAction::from_str("API_KEY_DELETE"),
+            Some(AuditAction::ApiKeyDelete)
+        );
+        assert_eq!(
+            AuditAction::from_str("ACCOUNT_UPDATE"),
+            Some(AuditAction::AccountUpdate)
+        );
+        assert_eq!(
+            AuditAction::from_str("ADMIN_ACTION"),
+            Some(AuditAction::AdminAction)
+        );
+
         // 测试无效的动作
         assert_eq!(AuditAction::from_str("INVALID"), None);
     }
@@ -43,7 +67,7 @@ mod audit_entity_tests {
         assert!(AuditAction::ApiKeyCreate.is_sensitive());
         assert!(AuditAction::ApiKeyDelete.is_sensitive());
         assert!(AuditAction::AdminAction.is_sensitive());
-        
+
         // 非敏感操作
         assert!(!AuditAction::UserLogout.is_sensitive());
         assert!(!AuditAction::ApiRequest.is_sensitive());
@@ -67,7 +91,7 @@ mod audit_entity_tests {
     fn test_mask_user_agent() {
         // 短 UA 保持原样
         assert_eq!(mask_user_agent("Mozilla/5.0"), "Mozilla/5.0");
-        
+
         // 长 UA 被截断
         let long_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
         let masked = mask_user_agent(long_ua);
@@ -78,8 +102,8 @@ mod audit_entity_tests {
 
 #[cfg(test)]
 mod audit_service_tests {
-    use foxnio::service::{AuditEntry, AuditFilter};
     use foxnio::entity::audit_logs::AuditAction;
+    use foxnio::service::{AuditEntry, AuditFilter};
 
     #[test]
     fn test_audit_entry_user_login() {
@@ -102,11 +126,7 @@ mod audit_service_tests {
     #[test]
     fn test_audit_entry_user_register() {
         let user_id = Uuid::new_v4();
-        let entry = AuditEntry::user_register(
-            user_id,
-            Some("10.0.0.1".to_string()),
-            None,
-        );
+        let entry = AuditEntry::user_register(user_id, Some("10.0.0.1".to_string()), None);
 
         assert_eq!(entry.user_id, Some(user_id));
         assert_eq!(entry.action, "USER_REGISTER");
@@ -194,16 +214,19 @@ mod audit_middleware_tests {
 
         assert!(config.log_all_requests);
         assert!(!config.log_request_body);
-        
+
         // 检查排除路径
         assert!(config.excluded_paths.contains(&"/health".to_string()));
         assert!(config.excluded_paths.contains(&"/health/live".to_string()));
         assert!(config.excluded_paths.contains(&"/health/ready".to_string()));
         assert!(config.excluded_paths.contains(&"/metrics".to_string()));
-        
+
         // 检查敏感路径
         assert!(config.sensitive_paths.iter().any(|p| p.contains("login")));
-        assert!(config.sensitive_paths.iter().any(|p| p.contains("password")));
+        assert!(config
+            .sensitive_paths
+            .iter()
+            .any(|p| p.contains("password")));
     }
 
     #[test]
@@ -260,8 +283,8 @@ mod audit_handler_tests {
 #[cfg(test)]
 mod performance_tests {
     use foxnio::service::AuditEntry;
-    use uuid::Uuid;
     use std::time::Instant;
+    use uuid::Uuid;
 
     #[test]
     fn test_audit_entry_creation_performance() {

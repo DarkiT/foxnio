@@ -1,13 +1,13 @@
 //! 上游账号服务 - 完整实现
 
 use anyhow::Result;
-use sea_orm::{
-    EntityTrait, QueryFilter, ColumnTrait, ActiveModelTrait, Set, 
-    DatabaseConnection, ActiveValue, QuerySelect, PaginatorTrait,
-};
-use uuid::Uuid;
 use chrono::Utc;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QuerySelect, Set,
+};
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::entity::accounts;
 
@@ -34,10 +34,10 @@ impl AccountService {
 
     /// 添加账号
     pub async fn add(
-        &self, 
-        name: &str, 
-        provider: &str, 
-        credential_type: &str, 
+        &self,
+        name: &str,
+        provider: &str,
+        credential_type: &str,
         credential: &str,
         priority: i32,
     ) -> Result<AccountInfo> {
@@ -105,10 +105,10 @@ impl AccountService {
 
     /// 更新账号状态
     pub async fn update_status(
-        &self, 
-        account_id: Uuid, 
-        status: &str, 
-        error: Option<&str>
+        &self,
+        account_id: Uuid,
+        status: &str,
+        error: Option<&str>,
     ) -> Result<()> {
         let account = accounts::Entity::find_by_id(account_id)
             .one(&self.db)
@@ -131,16 +131,19 @@ impl AccountService {
             .all(&self.db)
             .await?;
 
-        Ok(accounts.into_iter().map(|a| AccountInfo {
-            id: a.id,
-            name: a.name,
-            provider: a.provider,
-            credential_type: a.credential_type,
-            status: a.status,
-            priority: a.priority,
-            last_error: a.last_error,
-            created_at: a.created_at,
-        }).collect())
+        Ok(accounts
+            .into_iter()
+            .map(|a| AccountInfo {
+                id: a.id,
+                name: a.name,
+                provider: a.provider,
+                credential_type: a.credential_type,
+                status: a.status,
+                priority: a.priority,
+                last_error: a.last_error,
+                created_at: a.created_at,
+            })
+            .collect())
     }
 
     /// 删除账号

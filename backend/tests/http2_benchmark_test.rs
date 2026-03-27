@@ -2,10 +2,10 @@
 //!
 //! 对比 HTTP/1.1 vs HTTP/2 性能
 
-use std::time::{Duration, Instant};
-use std::sync::Arc;
-use tokio::sync::Semaphore;
 use futures::future::join_all;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::Semaphore;
 
 /// 测试配置
 struct TestConfig {
@@ -81,8 +81,14 @@ async fn run_benchmark(config: TestConfig, client: reqwest::Client) -> TestResul
         0.0
     };
 
-    let min_latency_ms = latencies.first().map(|d| d.as_secs_f64() * 1000.0).unwrap_or(0.0);
-    let max_latency_ms = latencies.last().map(|d| d.as_secs_f64() * 1000.0).unwrap_or(0.0);
+    let min_latency_ms = latencies
+        .first()
+        .map(|d| d.as_secs_f64() * 1000.0)
+        .unwrap_or(0.0);
+    let max_latency_ms = latencies
+        .last()
+        .map(|d| d.as_secs_f64() * 1000.0)
+        .unwrap_or(0.0);
 
     let requests_per_second = if total_time.as_secs_f64() > 0.0 {
         config.requests as f64 / total_time.as_secs_f64()
@@ -143,45 +149,57 @@ fn print_result(name: &str, result: &TestResult) {
 #[ignore = "Requires external HTTP/2 server"]
 async fn test_http2_vs_http1_benchmark() {
     // 测试配置
-    let test_configs = vec![
-        TestConfig {
-            url: "https://http2.pro/api/v1".to_string(),
-            requests: 100,
-            concurrency: 10,
-        },
-    ];
+    let test_configs = vec![TestConfig {
+        url: "https://http2.pro/api/v1".to_string(),
+        requests: 100,
+        concurrency: 10,
+    }];
 
     for config in test_configs {
         println!("\n{}", "=".repeat(60));
-        println!("Testing: {} ({} requests, {} concurrent)",
-                 config.url, config.requests, config.concurrency);
+        println!(
+            "Testing: {} ({} requests, {} concurrent)",
+            config.url, config.requests, config.concurrency
+        );
         println!("{}", "=".repeat(60));
 
         // HTTP/1.1 测试
         let http1_client = create_http1_client();
-        let http1_result = run_benchmark(TestConfig {
-            url: config.url.clone(),
-            requests: config.requests,
-            concurrency: config.concurrency,
-        }, http1_client).await;
+        let http1_result = run_benchmark(
+            TestConfig {
+                url: config.url.clone(),
+                requests: config.requests,
+                concurrency: config.concurrency,
+            },
+            http1_client,
+        )
+        .await;
         print_result("HTTP/1.1 Results", &http1_result);
 
         // HTTP/2 测试
         let http2_client = create_http2_client();
-        let http2_result = run_benchmark(TestConfig {
-            url: config.url.clone(),
-            requests: config.requests,
-            concurrency: config.concurrency,
-        }, http2_client).await;
+        let http2_result = run_benchmark(
+            TestConfig {
+                url: config.url.clone(),
+                requests: config.requests,
+                concurrency: config.concurrency,
+            },
+            http2_client,
+        )
+        .await;
         print_result("HTTP/2 Results", &http2_result);
 
         // 自动协商测试
         let auto_client = create_auto_negotiate_client();
-        let auto_result = run_benchmark(TestConfig {
-            url: config.url.clone(),
-            requests: config.requests,
-            concurrency: config.concurrency,
-        }, auto_client).await;
+        let auto_result = run_benchmark(
+            TestConfig {
+                url: config.url.clone(),
+                requests: config.requests,
+                concurrency: config.concurrency,
+            },
+            auto_client,
+        )
+        .await;
         print_result("Auto-Negotiate Results", &auto_result);
 
         // 性能对比
@@ -190,12 +208,14 @@ async fn test_http2_vs_http1_benchmark() {
         println!("{}", "-".repeat(40));
         if http1_result.requests_per_second > 0.0 {
             let improvement = (http2_result.requests_per_second - http1_result.requests_per_second)
-                             / http1_result.requests_per_second * 100.0;
+                / http1_result.requests_per_second
+                * 100.0;
             println!("HTTP/2 vs HTTP/1.1: {:+.1}% throughput", improvement);
         }
         if http1_result.avg_latency_ms > 0.0 {
             let latency_improvement = (http1_result.avg_latency_ms - http2_result.avg_latency_ms)
-                                     / http1_result.avg_latency_ms * 100.0;
+                / http1_result.avg_latency_ms
+                * 100.0;
             println!("HTTP/2 vs HTTP/1.1: {:+.1}% latency", latency_improvement);
         }
     }
@@ -223,7 +243,10 @@ async fn test_concurrent_requests_http2() {
     }
 
     let results: Vec<_> = join_all(handles).await;
-    let success_count = results.iter().filter(|r| r.as_ref().map(|&s| s).unwrap_or(false)).count();
+    let success_count = results
+        .iter()
+        .filter(|r| r.as_ref().map(|&s| s).unwrap_or(false))
+        .count();
 
     println!("Concurrent requests test: {}/100 successful", success_count);
     assert!(success_count > 90, "Expected at least 90% success rate");

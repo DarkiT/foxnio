@@ -3,9 +3,9 @@
 #[cfg(test)]
 mod tests {
     use crate::service::subscription::{
-        SubscriptionPlan, SubscriptionStatus, PlanFeatures, UserQuota
+        PlanFeatures, SubscriptionPlan, SubscriptionStatus, UserQuota,
     };
-    
+
     #[test]
     fn test_subscription_status() {
         let statuses = vec![
@@ -14,10 +14,10 @@ mod tests {
             SubscriptionStatus::Cancelled,
             SubscriptionStatus::Paused,
         ];
-        
+
         assert_eq!(statuses.len(), 4);
     }
-    
+
     #[test]
     fn test_plan_features_creation() {
         let features = PlanFeatures {
@@ -27,12 +27,12 @@ mod tests {
             priority: 1,
             rate_limit: 60,
         };
-        
+
         assert_eq!(features.max_requests_per_day, Some(100));
         assert_eq!(features.allowed_models.len(), 2);
         assert_eq!(features.rate_limit, 60);
     }
-    
+
     #[test]
     fn test_subscription_plan_creation() {
         let plan = SubscriptionPlan {
@@ -50,12 +50,12 @@ mod tests {
             is_active: true,
             created_at: chrono::Utc::now(),
         };
-        
+
         assert_eq!(plan.name, "Pro Plan");
         assert_eq!(plan.price, 9900);
         assert_eq!(plan.duration_days, 30);
     }
-    
+
     #[test]
     fn test_user_quota() {
         let quota = UserQuota {
@@ -65,12 +65,12 @@ mod tests {
             monthly_limit: Some(1000000),
             allowed_models: vec!["gpt-4".to_string(), "claude-3".to_string()],
         };
-        
+
         // 检查是否在限制内
         assert!(quota.daily_requests <= quota.daily_limit.unwrap());
         assert!(quota.monthly_tokens <= quota.monthly_limit.unwrap());
     }
-    
+
     #[test]
     fn test_user_quota_wildcard() {
         let quota = UserQuota {
@@ -80,30 +80,30 @@ mod tests {
             monthly_limit: None,
             allowed_models: vec!["*".to_string()],
         };
-        
+
         // 通配符应该允许所有模型
         assert!(quota.allowed_models.contains(&"*".to_string()));
     }
-    
+
     #[test]
     fn test_subscription_duration_calculation() {
         let now = chrono::Utc::now();
         let end = now + chrono::Duration::days(30);
-        
+
         let duration = end - now;
         assert_eq!(duration.num_days(), 30);
     }
-    
+
     #[test]
     fn test_plan_pricing() {
         // 不同计划的定价
         let plans = vec![
             ("Free", 0, 7),
-            ("Basic", 2900, 30),  // 29 yuan
-            ("Pro", 9900, 30),    // 99 yuan
+            ("Basic", 2900, 30),       // 29 yuan
+            ("Pro", 9900, 30),         // 99 yuan
             ("Enterprise", 29900, 30), // 299 yuan
         ];
-        
+
         for (name, price, _days) in &plans {
             if *name == "Free" {
                 assert_eq!(*price, 0);
@@ -112,16 +112,18 @@ mod tests {
             }
         }
     }
-    
+
     #[test]
     fn test_model_access_check() {
         let allowed_models = vec!["gpt-4".to_string(), "claude-3".to_string()];
-        
+
         // 检查模型是否在允许列表中
         let can_use_gpt4 = allowed_models.iter().any(|m| "gpt-4-turbo".starts_with(m));
-        let can_use_claude = allowed_models.iter().any(|m| "claude-3-opus".starts_with(m));
+        let can_use_claude = allowed_models
+            .iter()
+            .any(|m| "claude-3-opus".starts_with(m));
         let can_use_gemini = allowed_models.iter().any(|m| "gemini-pro".starts_with(m));
-        
+
         assert!(can_use_gpt4);
         assert!(can_use_claude);
         assert!(!can_use_gemini);

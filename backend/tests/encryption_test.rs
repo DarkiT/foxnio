@@ -6,11 +6,11 @@
 //! - 性能测试
 //! - 与实体集成
 
-use foxnio::utils::{
-    EncryptionService, EncryptedString, EncryptionError,
-    init_encryption_service_with_key, get_encryption_service, is_encryption_initialized,
-};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use foxnio::utils::{
+    get_encryption_service, init_encryption_service_with_key, is_encryption_initialized,
+    EncryptedString, EncryptionError, EncryptionService,
+};
 
 /// 创建测试用的加密服务
 fn create_test_encryption_service() -> EncryptionService {
@@ -88,7 +88,7 @@ mod encryption_tests {
     #[test]
     fn test_large_data() {
         let enc = create_test_encryption_service();
-        
+
         // 1MB 数据
         let plaintext = "x".repeat(1024 * 1024);
 
@@ -103,7 +103,7 @@ mod encryption_tests {
         let short_key = b"too-short";
         let result = EncryptionService::new(short_key);
         assert!(result.is_err());
-        
+
         let error = result.unwrap_err();
         assert!(error.to_string().contains("Invalid master key length"));
     }
@@ -333,7 +333,11 @@ mod performance_tests {
         );
 
         // 基本性能断言：每秒应该能处理至少 100 次 1KB 数据的加密解密
-        assert!(ops_per_sec > 100.0, "Encryption too slow: {} ops/sec", ops_per_sec);
+        assert!(
+            ops_per_sec > 100.0,
+            "Encryption too slow: {} ops/sec",
+            ops_per_sec
+        );
     }
 
     #[test]
@@ -430,7 +434,7 @@ mod key_generation_tests {
 
         // 验证可以用这个密钥创建服务
         let enc = EncryptionService::new(&decoded).unwrap();
-        
+
         // 验证可以正常加密解密
         let encrypted = enc.encrypt("test").unwrap();
         let decrypted = enc.decrypt(&encrypted).unwrap();
@@ -449,7 +453,7 @@ mod key_generation_tests {
     #[test]
     fn test_key_format() {
         let key = EncryptionService::generate_master_key();
-        
+
         // 应该是有效的 base64
         let decoded = BASE64.decode(&key).unwrap();
         assert_eq!(decoded.len(), 32);
@@ -463,7 +467,7 @@ mod edge_case_tests {
     #[test]
     fn test_max_length_string() {
         let enc = create_test_encryption_service();
-        
+
         // 测试非常大的字符串（10MB）
         let plaintext = "x".repeat(10 * 1024 * 1024);
 
@@ -476,7 +480,7 @@ mod edge_case_tests {
     #[test]
     fn test_binary_data() {
         let enc = create_test_encryption_service();
-        
+
         // 测试二进制数据（所有可能的字节值）
         let mut plaintext = Vec::with_capacity(256);
         for i in 0..=255u8 {
@@ -503,14 +507,7 @@ mod edge_case_tests {
     #[test]
     fn test_whitespace_only() {
         let enc = create_test_encryption_service();
-        let test_cases = vec![
-            " ",
-            "  ",
-            "\t",
-            "\n",
-            "\r\n",
-            "   \t\n\r\n   ",
-        ];
+        let test_cases = vec![" ", "  ", "\t", "\n", "\r\n", "   \t\n\r\n   "];
 
         for plaintext in test_cases {
             let encrypted = enc.encrypt(plaintext).unwrap();

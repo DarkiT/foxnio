@@ -1,6 +1,6 @@
 //! 邮件发送服务
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     transport::smtp::authentication::Credentials,
@@ -93,15 +93,13 @@ impl SmtpEmailSender {
     /// 发送邮件
     fn send_email(&self, to: &str, subject: &str, html_body: &str, text_body: &str) -> Result<()> {
         if !self.config.enabled {
-            tracing::info!(
-                "[Email Mock] To: {}, Subject: {}",
-                to,
-                subject
-            );
+            tracing::info!("[Email Mock] To: {}, Subject: {}", to, subject);
             return Ok(());
         }
 
-        let mailer = self.mailer.as_ref()
+        let mailer = self
+            .mailer
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Email sender not configured"))?;
 
         let from = format!("{} <{}>", self.config.from_name, self.config.from_address);
@@ -115,13 +113,13 @@ impl SmtpEmailSender {
                     .singlepart(
                         SinglePart::builder()
                             .header(ContentType::TEXT_PLAIN)
-                            .body(text_body.to_string())
+                            .body(text_body.to_string()),
                     )
                     .singlepart(
                         SinglePart::builder()
                             .header(ContentType::TEXT_HTML)
-                            .body(html_body.to_string())
-                    )
+                            .body(html_body.to_string()),
+                    ),
             )?;
 
         mailer.send(&email)?;
@@ -241,11 +239,7 @@ impl Default for MockEmailSender {
 
 impl EmailSender for MockEmailSender {
     fn send_password_reset_email(&self, to: &str, reset_url: &str) -> Result<()> {
-        tracing::info!(
-            "[Mock Email] To: {}, Reset URL: {}",
-            to,
-            reset_url
-        );
+        tracing::info!("[Mock Email] To: {}, Reset URL: {}", to, reset_url);
         self.sent_emails
             .lock()
             .unwrap()
@@ -275,7 +269,7 @@ mod tests {
         let sender = MockEmailSender::new();
         let result = sender.send_password_reset_email(
             "test@example.com",
-            "https://example.com/reset?token=abc123"
+            "https://example.com/reset?token=abc123",
         );
         assert!(result.is_ok());
 
@@ -288,7 +282,9 @@ mod tests {
     #[test]
     fn test_mock_email_sender_clear() {
         let sender = MockEmailSender::new();
-        sender.send_password_reset_email("test@example.com", "https://example.com/reset").unwrap();
+        sender
+            .send_password_reset_email("test@example.com", "https://example.com/reset")
+            .unwrap();
         assert_eq!(sender.get_sent_emails().len(), 1);
 
         sender.clear();
@@ -303,7 +299,8 @@ mod tests {
         };
 
         let sender = SmtpEmailSender::new(config).unwrap();
-        let result = sender.send_password_reset_email("test@example.com", "https://example.com/reset");
+        let result =
+            sender.send_password_reset_email("test@example.com", "https://example.com/reset");
         assert!(result.is_ok());
     }
 }

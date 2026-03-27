@@ -10,9 +10,9 @@
 mod common;
 
 use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, decode, Header, EncodingKey, DecodingKey};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 /// Access Token Claims
@@ -60,7 +60,8 @@ fn test_access_token_generation() {
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(!token.is_empty());
     assert!(token.contains('.'));
@@ -70,7 +71,8 @@ fn test_access_token_generation() {
         &token,
         &DecodingKey::from_secret(secret.as_bytes()),
         &jsonwebtoken::Validation::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     assert_eq!(decoded.claims.sub, user_id.to_string());
     assert_eq!(decoded.claims.jti, Some(jti));
@@ -95,7 +97,8 @@ fn test_refresh_token_generation() {
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(!token.is_empty());
 
@@ -103,7 +106,8 @@ fn test_refresh_token_generation() {
         &token,
         &DecodingKey::from_secret(secret.as_bytes()),
         &jsonwebtoken::Validation::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     assert_eq!(decoded.claims.sub, user_id.to_string());
     assert_eq!(decoded.claims.jti, jti);
@@ -128,7 +132,8 @@ fn test_token_expiration() {
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // 解析应该失败
     let result = decode::<TestClaims>(
@@ -147,7 +152,7 @@ fn test_token_expiration() {
 #[test]
 fn test_token_hash() {
     let token = "test-refresh-token-12345";
-    
+
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
     let hash1 = format!("{:x}", hasher.finalize());
@@ -198,7 +203,8 @@ fn test_token_rotation_security() {
         &Header::default(),
         &claims1,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // 生成第二个 refresh token（轮换后）
     let jti2 = Uuid::new_v4().to_string();
@@ -212,7 +218,8 @@ fn test_token_rotation_security() {
         &Header::default(),
         &claims2,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // 两个 token 应该不同
     assert_ne!(token1, token2);
@@ -266,7 +273,8 @@ fn test_token_format() {
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // JWT 格式：header.payload.signature
     let parts: Vec<&str> = token.split('.').collect();
@@ -275,7 +283,9 @@ fn test_token_format() {
     // 每部分都应该是 base64 编码
     for part in &parts {
         assert!(!part.is_empty());
-        assert!(part.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '='));
+        assert!(part
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '='));
     }
 }
 
@@ -286,7 +296,7 @@ fn test_token_format() {
 #[test]
 fn test_invalid_token_format() {
     let secret = "test-secret-key";
-    
+
     // 无效格式的 token
     let invalid_tokens = vec![
         "",
@@ -324,7 +334,8 @@ fn test_wrong_secret() {
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret1.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // 用错误的 secret 解析应该失败
     let result = decode::<TestClaims>(
@@ -358,7 +369,8 @@ fn test_token_valid_at_boundary() {
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // 立即验证应该成功
     let result = decode::<TestClaims>(
@@ -376,8 +388,8 @@ fn test_token_valid_at_boundary() {
 
 #[test]
 fn test_concurrent_token_generation() {
-    use std::thread;
     use std::sync::{Arc, Mutex};
+    use std::thread;
 
     let secret = "test-secret-key";
     let user_id = Uuid::new_v4();
@@ -403,7 +415,8 @@ fn test_concurrent_token_generation() {
                     &Header::default(),
                     &claims,
                     &EncodingKey::from_secret(secret.as_bytes()),
-                ).unwrap();
+                )
+                .unwrap();
 
                 tokens.lock().unwrap().push(token);
             })
@@ -415,7 +428,7 @@ fn test_concurrent_token_generation() {
     }
 
     let tokens = tokens.lock().unwrap();
-    
+
     // 所有 token 都应该不同（因为 jti 不同）
     let unique_tokens: std::collections::HashSet<_> = tokens.iter().cloned().collect();
     assert_eq!(unique_tokens.len(), 10);
@@ -429,7 +442,7 @@ fn test_concurrent_token_generation() {
 fn test_blacklist_simulation() {
     // 模拟黑名单行为
     let mut blacklist = std::collections::HashSet::new();
-    
+
     let jti1 = Uuid::new_v4().to_string();
     let jti2 = Uuid::new_v4().to_string();
 

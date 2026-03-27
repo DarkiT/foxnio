@@ -1,7 +1,7 @@
 //! TLS 指纹配置
 
 /// TLS 指纹配置
-/// 
+///
 /// 基于 Node.js 24.x (Claude Code 客户端) 的 TLS 握手特征
 /// JA3 Hash: 44f88fca027f27bab4bb08d4af15f23e
 /// JA4: t13d1714h1_5b57614c22b0_7baf387fc6ff
@@ -48,22 +48,15 @@ impl TLSFingerprint {
             enable_grease: true,
             signature_algorithms: DEFAULT_SIGNATURE_ALGORITHMS.to_vec(),
             alpn_protocols: vec!["http/1.1".to_string()],
-            supported_versions: vec![
-                TLS_VERSION_TLS13,
-                TLS_VERSION_TLS12,
-            ],
+            supported_versions: vec![TLS_VERSION_TLS13, TLS_VERSION_TLS12],
             key_share_groups: vec![CURVE_X25519],
             psk_modes: vec![PSK_MODE_DHE_KE],
             extensions: DEFAULT_EXTENSION_ORDER.to_vec(),
         }
     }
-    
+
     /// 自定义指纹
-    pub fn custom(
-        cipher_suites: Vec<u16>,
-        curves: Vec<u16>,
-        extensions: Vec<u16>,
-    ) -> Self {
+    pub fn custom(cipher_suites: Vec<u16>, curves: Vec<u16>, extensions: Vec<u16>) -> Self {
         Self {
             name: "custom".to_string(),
             cipher_suites,
@@ -89,34 +82,29 @@ pub const CURVE_P384: u16 = 0x0018;
 pub const PSK_MODE_DHE_KE: u16 = 0x0001;
 
 /// 默认密码套件（17 个，来自 Node.js 24.x）
-/// 
+///
 /// 注意：顺序对于 JA3 指纹非常重要
 pub const DEFAULT_CIPHER_SUITES: &[u16] = &[
     // TLS 1.3 cipher suites (3)
     0x1301, // TLS_AES_128_GCM_SHA256
     0x1302, // TLS_AES_256_GCM_SHA384
     0x1303, // TLS_CHACHA20_POLY1305_SHA256
-    
     // ECDHE + AES-GCM (4)
     0xc02b, // TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
     0xc02f, // TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
     0xc02c, // TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
     0xc030, // TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-    
     // ECDHE + ChaCha20-Poly1305 (2)
     0xcca9, // TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
     0xcca8, // TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
-    
     // ECDHE + AES-CBC-SHA (4)
     0xc009, // TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA
     0xc013, // TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
     0xc00a, // TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
     0xc014, // TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
-    
     // RSA + AES-GCM (2)
     0x009c, // TLS_RSA_WITH_AES_128_GCM_SHA256
     0x009d, // TLS_RSA_WITH_AES_256_GCM_SHA384
-    
     // RSA + AES-CBC-SHA (2)
     0x002f, // TLS_RSA_WITH_AES_128_CBC_SHA
     0x0035, // TLS_RSA_WITH_AES_256_CBC_SHA
@@ -124,9 +112,9 @@ pub const DEFAULT_CIPHER_SUITES: &[u16] = &[
 
 /// 默认曲线（3 个）
 pub const DEFAULT_CURVES: &[u16] = &[
-    CURVE_X25519,    // 0x001d
-    CURVE_P256,      // 0x0017 (secp256r1)
-    CURVE_P384,      // 0x0018 (secp384r1)
+    CURVE_X25519, // 0x001d
+    CURVE_P256,   // 0x0017 (secp256r1)
+    CURVE_P384,   // 0x0018 (secp384r1)
 ];
 
 /// 默认点格式
@@ -148,7 +136,7 @@ pub const DEFAULT_SIGNATURE_ALGORITHMS: &[u16] = &[
 ];
 
 /// 默认扩展顺序（19 个）
-/// 
+///
 /// 注意：顺序对于 JA3 指纹非常重要
 pub const DEFAULT_EXTENSION_ORDER: &[u16] = &[
     0,     // server_name
@@ -188,50 +176,50 @@ pub mod extensions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_tls_fingerprint_default() {
         let fp = TLSFingerprint::default();
-        
+
         assert_eq!(fp.name, "nodejs-24x");
         assert_eq!(fp.cipher_suites.len(), 17);
         assert_eq!(fp.curves.len(), 3);
         assert_eq!(fp.extensions.len(), 14);
     }
-    
+
     #[test]
     fn test_cipher_suites_count() {
         // 必须正好 17 个密码套件
         assert_eq!(DEFAULT_CIPHER_SUITES.len(), 17);
     }
-    
+
     #[test]
     fn test_curves_count() {
         // 必须正好 3 个曲线
         assert_eq!(DEFAULT_CURVES.len(), 3);
     }
-    
+
     #[test]
     fn test_signature_algorithms_count() {
         // 必须正好 9 个签名算法
         assert_eq!(DEFAULT_SIGNATURE_ALGORITHMS.len(), 9);
     }
-    
+
     #[test]
     fn test_extension_order() {
         // 第一个必须是 server_name (0)
         assert_eq!(DEFAULT_EXTENSION_ORDER[0], 0);
-        
+
         // 第二个必须是 ECH (65037)
         assert_eq!(DEFAULT_EXTENSION_ORDER[1], 65037);
     }
-    
+
     #[test]
     fn test_tls_version() {
         assert_eq!(TLS_VERSION_TLS13, 0x0304);
         assert_eq!(TLS_VERSION_TLS12, 0x0303);
     }
-    
+
     #[test]
     fn test_curve_ids() {
         assert_eq!(CURVE_X25519, 0x001d);

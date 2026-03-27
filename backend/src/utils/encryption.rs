@@ -12,7 +12,7 @@ use aes_gcm::{
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use rand::RngCore;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::env;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -75,8 +75,8 @@ impl EncryptionService {
     /// export FOXNIO_MASTER_KEY="new-key:old-key"
     /// ```
     pub fn from_env() -> Result<Self> {
-        let key_str = env::var("FOXNIO_MASTER_KEY")
-            .map_err(|_| EncryptionError::MasterKeyNotConfigured)?;
+        let key_str =
+            env::var("FOXNIO_MASTER_KEY").map_err(|_| EncryptionError::MasterKeyNotConfigured)?;
 
         // 检查是否包含密钥轮换格式（新密钥:旧密钥）
         if let Some((new_key, old_key)) = key_str.split_once(':') {
@@ -326,7 +326,10 @@ impl std::fmt::Debug for EncryptionService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EncryptionService")
             .field("master_key", &"[REDACTED]")
-            .field("old_master_key", &self.old_master_key.as_ref().map(|_| "[REDACTED]"))
+            .field(
+                "old_master_key",
+                &self.old_master_key.as_ref().map(|_| "[REDACTED]"),
+            )
             .finish()
     }
 }
@@ -687,7 +690,11 @@ mod performance_tests {
         );
 
         // 基本性能断言：每秒应该能处理至少 100 次 1KB 数据的加密解密
-        assert!(ops_per_sec > 100.0, "Encryption too slow: {} ops/sec", ops_per_sec);
+        assert!(
+            ops_per_sec > 100.0,
+            "Encryption too slow: {} ops/sec",
+            ops_per_sec
+        );
     }
 
     #[test]

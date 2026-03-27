@@ -1,14 +1,14 @@
 //! 调度器指标收集模块
-//! 
+//!
 //! 提供实时指标收集、聚合和查询功能
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicI64, Ordering};
-use std::time::{Duration, Instant};
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicI64, AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 /// 单个账号的实时指标
 #[derive(Debug)]
@@ -55,22 +55,23 @@ impl AccountMetrics {
     pub fn record_request_start(&self) {
         self.active_connections.fetch_add(1, Ordering::SeqCst);
         self.total_requests.fetch_add(1, Ordering::SeqCst);
-        self.last_used.store(Utc::now().timestamp(), Ordering::SeqCst);
+        self.last_used
+            .store(Utc::now().timestamp(), Ordering::SeqCst);
     }
 
     /// 记录请求成功
     pub async fn record_request_success(&self, latency_ms: u64, cost_cents: Option<u64>) {
         self.active_connections.fetch_sub(1, Ordering::SeqCst);
         self.success_requests.fetch_add(1, Ordering::SeqCst);
-        
+
         // 更新平均延迟
         self.update_avg_latency(latency_ms).await;
-        
+
         // 更新成本
         if let Some(cost) = cost_cents {
             self.total_cost_cents.fetch_add(cost, Ordering::SeqCst);
         }
-        
+
         // 更新错误率
         self.update_error_rate().await;
     }
@@ -79,7 +80,7 @@ impl AccountMetrics {
     pub async fn record_request_failure(&self) {
         self.active_connections.fetch_sub(1, Ordering::SeqCst);
         self.failed_requests.fetch_add(1, Ordering::SeqCst);
-        
+
         // 更新错误率
         self.update_error_rate().await;
     }
@@ -94,7 +95,7 @@ impl AccountMetrics {
                 latencies.remove(0);
             }
         }
-        
+
         // 计算新的平均值
         let latencies = self.recent_latencies.read().await;
         if !latencies.is_empty() {
@@ -108,7 +109,7 @@ impl AccountMetrics {
     async fn update_error_rate(&self) {
         let total = self.total_requests.load(Ordering::SeqCst);
         let failed = self.failed_requests.load(Ordering::SeqCst);
-        
+
         if total > 0 {
             let rate = (failed * 1000 / total) as u32;
             self.error_rate_per_mille.store(rate, Ordering::SeqCst);
@@ -129,7 +130,7 @@ impl AccountMetrics {
     pub fn get_success_rate(&self) -> f64 {
         let total = self.total_requests.load(Ordering::SeqCst);
         let success = self.success_requests.load(Ordering::SeqCst);
-        
+
         if total == 0 {
             1.0
         } else {
@@ -239,7 +240,7 @@ impl SchedulerMetrics {
             return Arc::clone(m);
         }
         drop(metrics);
-        
+
         let mut metrics = self.account_metrics.write().await;
         metrics
             .entry(account_id)
@@ -250,7 +251,8 @@ impl SchedulerMetrics {
     /// 记录调度成功
     pub fn record_schedule_success(&self, latency_ms: u64) {
         self.request_count.fetch_add(1, Ordering::SeqCst);
-        self.total_latency_ms.fetch_add(latency_ms, Ordering::SeqCst);
+        self.total_latency_ms
+            .fetch_add(latency_ms, Ordering::SeqCst);
         self.schedule_success_count.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -301,7 +303,7 @@ impl SchedulerMetrics {
         self.total_latency_ms.store(0, Ordering::SeqCst);
         self.schedule_success_count.store(0, Ordering::SeqCst);
         self.schedule_failure_count.store(0, Ordering::SeqCst);
-        
+
         let metrics = self.account_metrics.read().await;
         for m in metrics.values() {
             m.reset();
@@ -312,7 +314,7 @@ impl SchedulerMetrics {
     pub async fn cleanup_inactive_accounts(&self, max_age_secs: i64) {
         let mut metrics = self.account_metrics.write().await;
         let now = Utc::now().timestamp();
-        
+
         metrics.retain(|_, m| {
             let last_used = m.last_used.load(Ordering::SeqCst);
             now - last_used < max_age_secs
@@ -352,10 +354,10 @@ mod tests {
     #[tokio::test]
     async fn test_record_request() {
         let metrics = AccountMetrics::new();
-        
+
         metrics.record_request_start();
         assert_eq!(metrics.get_active_connections(), 1);
-        
+
         metrics.record_request_success(100, Some(50)).await;
         assert_eq!(metrics.get_active_connections(), 0);
         assert_eq!(metrics.get_avg_latency_ms(), 100);
@@ -365,21 +367,21 @@ mod tests {
     #[tokio::test]
     async fn test_error_rate_calculation() {
         let metrics = AccountMetrics::new();
-        
+
         // 10 次请求，2 次失败
         for _ in 0..8 {
             metrics.record_request_start();
             metrics.record_request_success(50, None).await;
         }
-        
+
         for _ in 0..2 {
             metrics.record_request_start();
             metrics.record_request_failure().await;
         }
-        
+
         assert_eq!(metrics.total_requests.load(Ordering::SeqCst), 10);
         assert_eq!(metrics.failed_requests.load(Ordering::SeqCst), 2);
-        
+
         // 错误率应该约为 0.2
         let error_rate = metrics.get_error_rate();
         assert!(error_rate > 0.15 && error_rate < 0.25);
@@ -388,11 +390,11 @@ mod tests {
     #[tokio::test]
     async fn test_scheduler_metrics() {
         let metrics = SchedulerMetrics::new();
-        
+
         metrics.record_schedule_success(100);
         metrics.record_schedule_success(200);
         metrics.record_schedule_failure();
-        
+
         assert_eq!(metrics.request_count.load(Ordering::SeqCst), 2);
         assert_eq!(metrics.get_avg_latency_ms(), 150);
         assert_eq!(metrics.schedule_failure_count.load(Ordering::SeqCst), 1);
@@ -402,10 +404,10 @@ mod tests {
     async fn test_get_or_create_account_metrics() {
         let metrics = SchedulerMetrics::new();
         let account_id = Uuid::new_v4();
-        
+
         let m1 = metrics.get_or_create_account_metrics(account_id).await;
         let m2 = metrics.get_or_create_account_metrics(account_id).await;
-        
+
         // 应该返回同一个实例
         assert!(Arc::ptr_eq(&m1, &m2));
     }
@@ -413,12 +415,12 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_snapshot() {
         let metrics = AccountMetrics::new();
-        
+
         metrics.record_request_start();
         metrics.record_request_success(150, Some(25)).await;
-        
+
         let snapshot = metrics.snapshot().await;
-        
+
         assert_eq!(snapshot.active_connections, 0);
         assert_eq!(snapshot.total_requests, 1);
         assert_eq!(snapshot.success_requests, 1);

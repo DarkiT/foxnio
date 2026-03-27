@@ -1,9 +1,14 @@
 //! HTTP 处理器模块
 
-pub mod auth;
 pub mod admin;
-pub mod health;
+pub mod alerts;
 pub mod audit;
+pub mod auth;
+pub mod health;
+pub mod metrics;
+
+use axum::{http::StatusCode, Json};
+use serde_json::json;
 
 // ApiError 定义
 #[derive(Debug)]
@@ -19,25 +24,53 @@ impl axum::response::IntoResponse for ApiError {
 }
 
 // 重新导出 auth 子模块
-pub use auth::{register, login, get_me, refresh, logout, logout_all};
+pub use auth::{get_me, login, logout, logout_all, refresh, register};
 
 pub use health::{
-    health_simple,
-    health_live,
-    health_ready,
-    health_detailed,
-    health_resources,
-    health_database,
-    health_redis,
-    app_info,
-    metrics,
+    app_info, health_database, health_detailed, health_live, health_ready, health_redis,
+    health_resources, health_simple, metrics,
 };
 
 pub use audit::{
-    list_audit_logs,
-    list_user_audit_logs,
-    list_sensitive_audit_logs,
-    list_my_audit_logs,
-    cleanup_audit_logs,
-    get_audit_stats,
+    cleanup_audit_logs, get_audit_stats, list_audit_logs, list_my_audit_logs,
+    list_sensitive_audit_logs, list_user_audit_logs,
 };
+
+/// 列出可用模型 (OpenAI 兼容 API)
+pub async fn list_models() -> Result<Json<serde_json::Value>, ApiError> {
+    use crate::gateway::models::{get_model_info, Model};
+
+    let models: Vec<serde_json::Value> = Model::all()
+        .into_iter()
+        .filter_map(|m| {
+            let info = get_model_info(m)?;
+            Some(json!({
+                "id": info.id,
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": info.provider.to_lowercase(),
+                "permission": [{
+                    "id": format!("modelperm-{}", info.id),
+                    "object": "model_permission",
+                    "created": 1700000000,
+                    "allow_create_engine": false,
+                    "allow_sampling": true,
+                    "allow_logprobs": true,
+                    "allow_search_indices": false,
+                    "allow_view": true,
+                    "allow_fine_tuning": false,
+                    "organization": "*",
+                    "group": null,
+                    "is_blocking": false
+                }],
+                "root": info.id,
+                "parent": null,
+            }))
+        })
+        .collect();
+
+    Ok(Json(json!({
+        "object": "list",
+        "data": models
+    })))
+}

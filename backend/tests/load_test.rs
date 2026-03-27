@@ -1,8 +1,8 @@
 //! 负载测试配置
 
-use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// 负载测试配置
 pub struct LoadTestConfig {
@@ -42,16 +42,16 @@ pub async fn run_load_test(config: LoadTestConfig) -> LoadTestResult {
         .timeout(Duration::from_secs(30))
         .build()
         .unwrap();
-    
+
     let total_requests = Arc::new(AtomicU64::new(0));
     let successful_requests = Arc::new(AtomicU64::new(0));
     let failed_requests = Arc::new(AtomicU64::new(0));
     let latencies = Arc::new(std::sync::Mutex::new(Vec::new()));
-    
+
     let start = Instant::now();
-    
+
     let mut handles = vec![];
-    
+
     for _ in 0..config.concurrent_users {
         let client = client.clone();
         let url = config.target_url.clone();
@@ -60,13 +60,13 @@ pub async fn run_load_test(config: LoadTestConfig) -> LoadTestResult {
         let success = successful_requests.clone();
         let failed = failed_requests.clone();
         let lats = latencies.clone();
-        
+
         let handle = tokio::spawn(async move {
             for _ in 0..config.requests_per_user {
                 total.fetch_add(1, Ordering::SeqCst);
-                
+
                 let req_start = Instant::now();
-                
+
                 let result = client
                     .post(&url)
                     .header("Authorization", format!("Bearer {}", api_key))
@@ -77,10 +77,10 @@ pub async fn run_load_test(config: LoadTestConfig) -> LoadTestResult {
                     }))
                     .send()
                     .await;
-                
+
                 let latency = req_start.elapsed();
                 lats.lock().unwrap().push(latency);
-                
+
                 match result {
                     Ok(resp) if resp.status().is_success() => {
                         success.fetch_add(1, Ordering::SeqCst);
@@ -91,30 +91,38 @@ pub async fn run_load_test(config: LoadTestConfig) -> LoadTestResult {
                 }
             }
         });
-        
+
         handles.push(handle);
     }
-    
+
     // 等待所有请求完成
     for handle in handles {
         handle.await.unwrap();
     }
-    
+
     let duration = start.elapsed();
     let latencies = latencies.lock().unwrap();
-    
+
     let avg_latency = if !latencies.is_empty() {
         latencies.iter().sum::<Duration>() / latencies.len() as u32
     } else {
         Duration::from_secs(0)
     };
-    
-    let min_latency = latencies.iter().min().copied().unwrap_or(Duration::from_secs(0));
-    let max_latency = latencies.iter().max().copied().unwrap_or(Duration::from_secs(0));
-    
+
+    let min_latency = latencies
+        .iter()
+        .min()
+        .copied()
+        .unwrap_or(Duration::from_secs(0));
+    let max_latency = latencies
+        .iter()
+        .max()
+        .copied()
+        .unwrap_or(Duration::from_secs(0));
+
     let total = total_requests.load(Ordering::SeqCst);
     let rps = total as f64 / duration.as_secs_f64();
-    
+
     LoadTestResult {
         total_requests: total,
         successful_requests: successful_requests.load(Ordering::SeqCst),
@@ -130,7 +138,7 @@ pub async fn run_load_test(config: LoadTestConfig) -> LoadTestResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     #[ignore] // 需要运行的服务
     async fn test_light_load() {
@@ -139,9 +147,9 @@ mod tests {
             requests_per_user: 10,
             ..Default::default()
         };
-        
+
         let result = run_load_test(config).await;
-        
+
         println!("\n=== Load Test Results ===");
         println!("Total Requests: {}", result.total_requests);
         println!("Successful: {}", result.successful_requests);
@@ -151,12 +159,12 @@ mod tests {
         println!("Min Latency: {:?}", result.min_latency);
         println!("Max Latency: {:?}", result.max_latency);
         println!("Requests/sec: {:.2}", result.requests_per_second);
-        
+
         // 验证成功率
         let success_rate = result.successful_requests as f64 / result.total_requests as f64;
         assert!(success_rate > 0.9, "Success rate should be > 90%");
     }
-    
+
     #[tokio::test]
     #[ignore]
     async fn test_medium_load() {
@@ -165,13 +173,13 @@ mod tests {
             requests_per_user: 50,
             ..Default::default()
         };
-        
+
         let result = run_load_test(config).await;
-        
+
         println!("\n=== Medium Load Test ===");
         println!("Requests/sec: {:.2}", result.requests_per_second);
     }
-    
+
     #[tokio::test]
     #[ignore]
     async fn test_heavy_load() {
@@ -180,9 +188,9 @@ mod tests {
             requests_per_user: 100,
             ..Default::default()
         };
-        
+
         let result = run_load_test(config).await;
-        
+
         println!("\n=== Heavy Load Test ===");
         println!("Requests/sec: {:.2}", result.requests_per_second);
         println!("Failed: {}", result.failed_requests);

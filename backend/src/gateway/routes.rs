@@ -3,29 +3,29 @@
 //! 使用角色权限系统进行路由保护
 
 use axum::{
-    routing::{get, post, delete, put},
-    Router,
-    Extension,
     http::StatusCode,
-    Json,
+    routing::{delete, get, post, put},
+    Extension, Json, Router,
 };
+use serde_json::json;
+use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
-use serde_json::json;
-use std::sync::Arc;
 
-use super::{SharedState, middleware, handler::GatewayHandler};
-use crate::service::{UserService, ApiKeyService, AccountService, BillingService, SchedulerService};
-use crate::service::permission::Permission;
+use super::{handler::GatewayHandler, middleware, SharedState};
 use crate::gateway::middleware::permission::check_permission;
 use crate::handler;
 use crate::health::HealthChecker;
+use crate::service::permission::Permission;
+use crate::service::{
+    AccountService, ApiKeyService, BillingService, SchedulerService, UserService,
+};
 
 pub fn build_app(state: super::AppState, health_checker: Arc<HealthChecker>) -> Router {
     let shared_state = Arc::new(state);
-    
+
     // 公开路由
     let public_routes = Router::new()
         // Health check endpoints
@@ -37,57 +37,75 @@ pub fn build_app(state: super::AppState, health_checker: Arc<HealthChecker>) -> 
         .route("/health/database", get(handler::health_database))
         .route("/health/redis", get(handler::health_redis))
         .route("/health/info", get(handler::app_info))
-        .route("/metrics", get(handler::metrics))
-        
+        // Prometheus 指标端点
+        .route("/metrics", get(handler::metrics::prometheus_metrics))
         // API 端点（OpenAI 兼容）
         .route("/v1/models", get(handler::list_models))
-        
         // 认证
         .route("/api/v1/auth/register", post(handler::auth::register))
         .route("/api/v1/auth/login", post(handler::auth::login))
-        
         // TOTP 登录（公开，使用临时 token）
         .route("/api/v1/auth/totp/login", post(handler::auth::totp_login))
-        .route("/api/v1/auth/totp/backup-login", post(handler::auth::backup_code_login))
-        
+        .route(
+            "/api/v1/auth/totp/backup-login",
+            post(handler::auth::backup_code_login),
+        )
         // 密码重置
-        .route("/api/v1/auth/password/reset-request", post(handler::auth::password::request_reset))
-        .route("/api/v1/auth/password/verify-token", post(handler::auth::password::verify_token))
-        .route("/api/v1/auth/password/reset", post(handler::auth::password::reset_password))
-        
+        .route(
+            "/api/v1/auth/password/reset-request",
+            post(handler::auth::password::request_reset),
+        )
+        .route(
+            "/api/v1/auth/password/verify-token",
+            post(handler::auth::password::verify_token),
+        )
+        .route(
+            "/api/v1/auth/password/reset",
+            post(handler::auth::password::reset_password),
+        )
         // 添加 HealthChecker 状态
         .with_state(health_checker.clone());
-    
+
     // 需要认证的路由
     let auth_routes = Router::new()
         // 用户信息
         .route("/api/v1/user/me", get(handler::auth::get_me))
         .route("/api/v1/user/usage", get(get_user_usage))
-        
         // 用户审计日志
-        .route("/api/v1/users/me/audit-logs", get(handler::list_my_audit_logs))
-        
+        .route(
+            "/api/v1/users/me/audit-logs",
+            get(handler::list_my_audit_logs),
+        )
         // TOTP 两步验证管理
         .route("/api/v1/auth/totp/enable", post(handler::auth::enable_totp))
-        .route("/api/v1/auth/totp/confirm", post(handler::auth::confirm_enable_totp))
-        .route("/api/v1/auth/totp/disable", post(handler::auth::disable_totp))
+        .route(
+            "/api/v1/auth/totp/confirm",
+            post(handler::auth::confirm_enable_totp),
+        )
+        .route(
+            "/api/v1/auth/totp/disable",
+            post(handler::auth::disable_totp),
+        )
         .route("/api/v1/auth/totp/verify", post(handler::auth::verify_totp))
-        .route("/api/v1/auth/totp/status", get(handler::auth::get_totp_status))
-        .route("/api/v1/auth/totp/backup-codes/regenerate", post(handler::auth::regenerate_backup_codes))
-        
+        .route(
+            "/api/v1/auth/totp/status",
+            get(handler::auth::get_totp_status),
+        )
+        .route(
+            "/api/v1/auth/totp/backup-codes/regenerate",
+            post(handler::auth::regenerate_backup_codes),
+        )
         // Chat completions (需要 API Key)
         .route("/v1/chat/completions", post(handle_chat_completions))
         .route("/v1/messages", post(handle_messages))
         .route("/v1/completions", post(handle_completions))
-        
         // API Keys
         .route("/api/v1/user/apikeys", get(list_user_apikeys))
         .route("/api/v1/user/apikeys", post(create_user_apikey))
         .route("/api/v1/user/apikeys/:id", delete(delete_user_apikey))
         .route("/api/v1/user/apikeys/:id", put(update_user_apikey))
-        
         .layer(axum::middleware::from_fn(middleware::jwt_auth));
-    
+
     // 管理后台路由 - 使用权限系统
     let admin_routes = Router::new()
         // 用户管理 - 需要 UserRead/Write/Delete 权限
@@ -95,54 +113,158 @@ pub fn build_app(state: super::AppState, health_checker: Arc<HealthChecker>) -> 
         .route("/api/v1/admin/users", post(handler::admin::create_user))
         .route("/api/v1/admin/users/:id", get(handler::admin::get_user))
         .route("/api/v1/admin/users/:id", put(handler::admin::update_user))
-        .route("/api/v1/admin/users/:id", delete(handler::admin::delete_user))
-        .route("/api/v1/admin/users/:id/balance", post(handler::admin::update_user_balance))
-        
+        .route(
+            "/api/v1/admin/users/:id",
+            delete(handler::admin::delete_user),
+        )
+        .route(
+            "/api/v1/admin/users/:id/balance",
+            post(handler::admin::update_user_balance),
+        )
         // 账号管理 - 需要 AccountRead/Write 权限
         .route("/api/v1/admin/accounts", get(handler::admin::list_accounts))
         .route("/api/v1/admin/accounts", post(handler::admin::add_account))
         .route("/api/v1/admin/accounts/:id", get(get_account_detail))
         .route("/api/v1/admin/accounts/:id", put(update_account))
-        .route("/api/v1/admin/accounts/:id", delete(handler::admin::delete_account_by_id))
+        .route(
+            "/api/v1/admin/accounts/:id",
+            delete(handler::admin::delete_account_by_id),
+        )
         .route("/api/v1/admin/accounts/test", post(test_account))
-        
         // API Key 管理 - 需要 ApiKeyRead 权限
         .route("/api/v1/admin/apikeys", get(handler::admin::list_apikeys))
-        
         // 统计和监控 - 需要 BillingRead 权限
         .route("/api/v1/admin/stats", get(handler::admin::get_stats))
-        .route("/api/v1/admin/dashboard", get(handler::admin::get_dashboard))
-        
+        .route(
+            "/api/v1/admin/dashboard",
+            get(handler::admin::get_dashboard),
+        )
+        // 指标监控端点
+        .route("/api/v1/admin/metrics", get(handler::metrics::json_metrics))
+        .route(
+            "/api/v1/admin/metrics/detail",
+            get(handler::metrics::detailed_metrics),
+        )
+        .route(
+            "/api/v1/admin/metrics/health",
+            get(handler::metrics::metrics_health),
+        )
+        .route(
+            "/api/v1/admin/metrics/realtime",
+            get(handler::metrics::realtime_metrics),
+        )
+        .route(
+            "/api/v1/admin/metrics/cost",
+            get(handler::metrics::cost_metrics),
+        )
+        .route(
+            "/api/v1/admin/metrics/tokens",
+            get(handler::metrics::token_metrics),
+        )
+        .route(
+            "/api/v1/admin/metrics/accounts",
+            get(handler::metrics::account_metrics),
+        )
         // 权限管理
-        .route("/api/v1/admin/permissions/matrix", get(handler::admin::get_permission_matrix))
+        .route(
+            "/api/v1/admin/permissions/matrix",
+            get(handler::admin::get_permission_matrix),
+        )
         .route("/api/v1/admin/roles", get(handler::admin::list_roles))
-        
         // 审计日志管理
         .route("/api/v1/admin/audit-logs", get(handler::list_audit_logs))
-        .route("/api/v1/admin/audit-logs/stats", get(handler::get_audit_stats))
-        .route("/api/v1/admin/audit-logs/sensitive", get(handler::list_sensitive_audit_logs))
-        .route("/api/v1/admin/audit-logs/users/:user_id", get(handler::list_user_audit_logs))
-        .route("/api/v1/admin/audit-logs/cleanup", post(handler::cleanup_audit_logs))
-        
+        .route(
+            "/api/v1/admin/audit-logs/stats",
+            get(handler::get_audit_stats),
+        )
+        .route(
+            "/api/v1/admin/audit-logs/sensitive",
+            get(handler::list_sensitive_audit_logs),
+        )
+        .route(
+            "/api/v1/admin/audit-logs/users/:user_id",
+            get(handler::list_user_audit_logs),
+        )
+        .route(
+            "/api/v1/admin/audit-logs/cleanup",
+            post(handler::cleanup_audit_logs),
+        )
+        // 告警管理
+        .route(
+            "/api/v1/admin/alerts/rules",
+            get(handler::alerts::list_rules),
+        )
+        .route(
+            "/api/v1/admin/alerts/rules",
+            post(handler::alerts::create_rule),
+        )
+        .route(
+            "/api/v1/admin/alerts/rules/:id",
+            delete(handler::alerts::delete_rule),
+        )
+        .route(
+            "/api/v1/admin/alerts/silences",
+            get(handler::alerts::list_silences),
+        )
+        .route(
+            "/api/v1/admin/alerts/silences",
+            post(handler::alerts::create_silence),
+        )
+        .route(
+            "/api/v1/admin/alerts/silences/:id",
+            delete(handler::alerts::delete_silence),
+        )
+        .route(
+            "/api/v1/admin/alerts/history",
+            get(handler::alerts::list_history),
+        )
+        .route(
+            "/api/v1/admin/alerts/stats",
+            get(handler::alerts::get_stats),
+        )
+        .route(
+            "/api/v1/admin/alerts/channels",
+            get(handler::alerts::list_channels),
+        )
+        .route(
+            "/api/v1/admin/alerts/channels",
+            post(handler::alerts::register_channel),
+        )
+        .route(
+            "/api/v1/admin/alerts/channels/:id",
+            delete(handler::alerts::delete_channel),
+        )
+        .route(
+            "/api/v1/admin/alerts/test",
+            post(handler::alerts::test_alert),
+        )
         .layer(axum::middleware::from_fn(middleware::jwt_auth));
-    
+
     // Gemini 专用路由
     let gemini_routes = Router::new()
         .route("/v1beta/models/:model:generateContent", post(handle_gemini))
-        .route("/v1beta/models/:model:streamGenerateContent", post(handle_gemini_stream))
-        
+        .route(
+            "/v1beta/models/:model:streamGenerateContent",
+            post(handle_gemini_stream),
+        )
         .layer(axum::middleware::from_fn(middleware::jwt_auth));
-    
+
     Router::new()
         .merge(public_routes)
         .merge(auth_routes)
         .merge(admin_routes)
         .merge(gemini_routes)
-        
         // Layers - 压缩中间件
-        .layer(axum::middleware::from_fn(middleware::compression_middleware))
+        .layer(axum::middleware::from_fn(
+            middleware::compression_middleware,
+        ))
         // Layers
-        .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn(middleware::request_log))
         .layer(axum::middleware::from_fn(middleware::request_id))
@@ -168,22 +290,24 @@ async fn handle_chat_completions(
     // 解析请求体
     let req: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|e| handler::ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
-    
-    let model = req.get("model")
+
+    let model = req
+        .get("model")
         .and_then(|m| m.as_str())
-        .ok_or(handler::ApiError(StatusCode::BAD_REQUEST, "Missing model".into()))?;
-    
-    let stream = req.get("stream")
-        .and_then(|s| s.as_bool())
-        .unwrap_or(false);
-    
+        .ok_or(handler::ApiError(
+            StatusCode::BAD_REQUEST,
+            "Missing model".into(),
+        ))?;
+
+    let stream = req.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
+
     let user_id = uuid::Uuid::parse_str(&claims.sub)
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+
     // TODO: 实现完整的请求转发
     Err(handler::ApiError(
         StatusCode::NOT_IMPLEMENTED,
-        "Chat completions forwarding not yet implemented".into()
+        "Chat completions forwarding not yet implemented".into(),
     ))
 }
 
@@ -194,15 +318,19 @@ async fn handle_messages(
 ) -> Result<axum::Json<serde_json::Value>, handler::ApiError> {
     let req: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|e| handler::ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
-    
-    let model = req.get("model")
+
+    let model = req
+        .get("model")
         .and_then(|m| m.as_str())
-        .ok_or(handler::ApiError(StatusCode::BAD_REQUEST, "Missing model".into()))?;
-    
+        .ok_or(handler::ApiError(
+            StatusCode::BAD_REQUEST,
+            "Missing model".into(),
+        ))?;
+
     // TODO: 实现完整的 Anthropic messages 转发
     Err(handler::ApiError(
         StatusCode::NOT_IMPLEMENTED,
-        "Messages forwarding not yet implemented".into()
+        "Messages forwarding not yet implemented".into(),
     ))
 }
 
@@ -214,7 +342,7 @@ async fn handle_completions(
     // TODO: 实现旧的 completions 端点
     Err(handler::ApiError(
         StatusCode::NOT_IMPLEMENTED,
-        "Completions not yet implemented".into()
+        "Completions not yet implemented".into(),
     ))
 }
 
@@ -226,7 +354,7 @@ async fn handle_gemini(
     // TODO: 实现 Gemini 端点
     Err(handler::ApiError(
         StatusCode::NOT_IMPLEMENTED,
-        "Gemini not yet implemented".into()
+        "Gemini not yet implemented".into(),
     ))
 }
 
@@ -238,7 +366,7 @@ async fn handle_gemini_stream(
     // TODO: 实现 Gemini 流式端点
     Err(handler::ApiError(
         StatusCode::NOT_IMPLEMENTED,
-        "Gemini streaming not yet implemented".into()
+        "Gemini streaming not yet implemented".into(),
     ))
 }
 
@@ -250,16 +378,15 @@ async fn get_user_usage(
 ) -> Result<axum::Json<serde_json::Value>, handler::ApiError> {
     let user_id = uuid::Uuid::parse_str(&claims.sub)
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
-    let billing_service = BillingService::new(
-        state.db.clone(),
-        state.config.gateway.rate_multiplier,
-    );
-    
-    let stats = billing_service.get_user_stats(user_id, 30)
+
+    let billing_service =
+        BillingService::new(state.db.clone(), state.config.gateway.rate_multiplier);
+
+    let stats = billing_service
+        .get_user_stats(user_id, 30)
         .await
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
+
     Ok(axum::Json(json!({
         "total_requests": stats.total_requests,
         "total_input_tokens": stats.total_input_tokens,
@@ -283,7 +410,8 @@ async fn list_user_apikeys(
         state.config.gateway.api_key_prefix.clone(),
     );
 
-    let keys = api_key_service.list_by_user(user_id)
+    let keys = api_key_service
+        .list_by_user(user_id)
         .await
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -315,7 +443,8 @@ async fn create_user_apikey(
         state.config.gateway.api_key_prefix.clone(),
     );
 
-    let key = api_key_service.create(user_id, name.map(|s| s.to_string()))
+    let key = api_key_service
+        .create(user_id, name.map(|s| s.to_string()))
         .await
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -344,7 +473,8 @@ async fn delete_user_apikey(
         state.config.gateway.api_key_prefix.clone(),
     );
 
-    api_key_service.delete(user_id, key_id)
+    api_key_service
+        .delete(user_id, key_id)
         .await
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -372,7 +502,7 @@ async fn get_account_detail(
     check_permission(&claims, Permission::AccountRead)
         .await
         .map_err(|e| handler::ApiError(StatusCode::FORBIDDEN, e))?;
-    
+
     // TODO: 实现账号详情
     Ok(axum::Json(json!({ "id": id })))
 }
@@ -387,7 +517,7 @@ async fn update_account(
     check_permission(&claims, Permission::AccountWrite)
         .await
         .map_err(|e| handler::ApiError(StatusCode::FORBIDDEN, e))?;
-    
+
     // TODO: 实现账号更新
     Ok(axum::Json(json!({ "success": true })))
 }
@@ -401,7 +531,9 @@ async fn test_account(
     check_permission(&claims, Permission::AccountWrite)
         .await
         .map_err(|e| handler::ApiError(StatusCode::FORBIDDEN, e))?;
-    
+
     // TODO: 实现账号测试
-    Ok(axum::Json(json!({ "success": true, "message": "Account test not yet implemented" })))
+    Ok(axum::Json(
+        json!({ "success": true, "message": "Account test not yet implemented" }),
+    ))
 }

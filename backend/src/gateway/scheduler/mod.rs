@@ -2,20 +2,22 @@
 //!
 //! 提供 6 种调度策略，支持实时指标收集和成本优化
 
-pub mod metrics;
 pub mod cost_optimizer;
+pub mod metrics;
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use chrono::{DateTime, Utc};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use rand::Rng;
 
-pub use metrics::{SchedulerMetrics, AccountMetrics, AccountMetricsSnapshot, SchedulerMetricsSnapshot};
-pub use cost_optimizer::{CostOptimizer, CostConfig, BudgetSummary, OptimizationSuggestion};
+pub use cost_optimizer::{BudgetSummary, CostConfig, CostOptimizer, OptimizationSuggestion};
+pub use metrics::{
+    AccountMetrics, AccountMetricsSnapshot, SchedulerMetrics, SchedulerMetricsSnapshot,
+};
 
 /// 调度策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -215,7 +217,7 @@ impl Scheduler {
     /// 添加账号
     pub async fn add_account(&self, account: AccountInfo) {
         let mut accounts = self.accounts.write().await;
-        
+
         // 检查是否已存在
         if let Some(existing) = accounts.iter_mut().find(|a| a.id == account.id) {
             *existing = account;
@@ -259,7 +261,7 @@ impl Scheduler {
 
         // 2. 获取可用账号
         let available = self.get_available_accounts(ctx).await;
-        
+
         if available.is_empty() {
             self.metrics.record_schedule_failure();
             return None;
@@ -279,15 +281,19 @@ impl Scheduler {
         // 4. 设置粘性会话
         if let Some(ref result) = result {
             if let Some(ref session_id) = ctx.session_id {
-                self.set_sticky_session(session_id.clone(), result.account.id).await;
+                self.set_sticky_session(session_id.clone(), result.account.id)
+                    .await;
             }
-            
+
             // 记录指标
             let latency = start.elapsed().as_millis() as u64;
             self.metrics.record_schedule_success(latency);
-            
+
             // 更新账号指标
-            let account_metrics = self.metrics.get_or_create_account_metrics(result.account.id).await;
+            let account_metrics = self
+                .metrics
+                .get_or_create_account_metrics(result.account.id)
+                .await;
             account_metrics.record_request_start();
         }
 
@@ -295,9 +301,13 @@ impl Scheduler {
     }
 
     /// 获取粘性会话的账号
-    async fn get_sticky_account(&self, session_id: &str, _ctx: &ScheduleContext) -> Option<ScheduleResult> {
+    async fn get_sticky_account(
+        &self,
+        session_id: &str,
+        _ctx: &ScheduleContext,
+    ) -> Option<ScheduleResult> {
         let sessions = self.sticky_sessions.read().await;
-        
+
         if let Some(sticky) = sessions.get(session_id) {
             // 检查是否过期
             let now = Utc::now();
@@ -309,8 +319,9 @@ impl Scheduler {
             let accounts = self.accounts.read().await;
             if let Some(account) = accounts.iter().find(|a| a.id == sticky.account_id) {
                 if account.status.is_available() && !self.is_in_cooldown(account.id).await {
-                    let account_metrics = self.metrics.get_or_create_account_metrics(account.id).await;
-                    
+                    let account_metrics =
+                        self.metrics.get_or_create_account_metrics(account.id).await;
+
                     return Some(ScheduleResult {
                         account: account.clone(),
                         strategy_used: ScheduleStrategy::RoundRobin, // 粘性会话不计策略
@@ -329,14 +340,14 @@ impl Scheduler {
     async fn set_sticky_session(&self, session_id: String, account_id: Uuid) {
         let mut sessions = self.sticky_sessions.write().await;
         let now = Utc::now();
-        
+
         let sticky = sessions.entry(session_id).or_insert(StickySession {
             account_id,
             created_at: now,
             last_accessed: now,
             request_count: 0,
         });
-        
+
         sticky.last_accessed = now;
         sticky.request_count += 1;
     }
@@ -344,12 +355,10 @@ impl Scheduler {
     /// 获取可用账号列表
     async fn get_available_accounts(&self, _ctx: &ScheduleContext) -> Vec<AccountInfo> {
         let accounts = self.accounts.read().await;
-        
-        accounts.iter()
-            .filter(|a| {
-                a.status.is_available() 
-                    && !self.is_in_cooldown_sync(a.id)
-            })
+
+        accounts
+            .iter()
+            .filter(|a| a.status.is_available() && !self.is_in_cooldown_sync(a.id))
             .cloned()
             .collect()
     }
@@ -393,9 +402,9 @@ impl Scheduler {
 
         let index = self.round_robin_index.fetch_add(1, Ordering::SeqCst);
         let account = accounts[index % accounts.len()].clone();
-        
+
         let account_metrics = self.metrics.get_or_create_account_metrics(account.id).await;
-        
+
         Some(ScheduleResult {
             account,
             strategy_used: ScheduleStrategy::RoundRobin,
@@ -417,7 +426,7 @@ impl Scheduler {
         for account in accounts {
             let metrics = self.metrics.get_or_create_account_metrics(account.id).await;
             let connections = metrics.get_active_connections();
-            
+
             if connections < min_connections {
                 min_connections = connections;
                 best_account = Some(account);
@@ -443,18 +452,18 @@ impl Scheduler {
 
         // 计算每个账号的权重（响应时间越低，权重越高）
         let mut weighted_accounts: Vec<(f64, &AccountInfo)> = Vec::new();
-        
+
         for account in accounts {
             let metrics = self.metrics.get_or_create_account_metrics(account.id).await;
             let avg_latency = metrics.get_avg_latency_ms();
-            
+
             // 使用倒数作为权重，延迟越低权重越高
             let weight = if avg_latency == 0 {
                 1.0 // 无历史数据，给予中等权重
             } else {
                 1000.0 / avg_latency as f64
             };
-            
+
             weighted_accounts.push((weight, account));
         }
 
@@ -462,7 +471,7 @@ impl Scheduler {
         let total_weight: f64 = weighted_accounts.iter().map(|(w, _)| w).sum();
         let mut rng = rand::thread_rng();
         let mut target = rng.gen_range(0.0..total_weight);
-        
+
         for (weight, account) in weighted_accounts {
             target -= weight;
             if target <= 0.0 {
@@ -490,7 +499,11 @@ impl Scheduler {
     }
 
     /// 成本优化选择
-    async fn select_cost_optimized(&self, accounts: &[AccountInfo], ctx: &ScheduleContext) -> Option<ScheduleResult> {
+    async fn select_cost_optimized(
+        &self,
+        accounts: &[AccountInfo],
+        ctx: &ScheduleContext,
+    ) -> Option<ScheduleResult> {
         if accounts.is_empty() {
             return None;
         }
@@ -500,29 +513,30 @@ impl Scheduler {
 
         for account in accounts {
             let metrics = self.metrics.get_or_create_account_metrics(account.id).await;
-            let cost_score = self.cost_optimizer.get_account_cost_score(account.id, &metrics).await;
-            
+            let cost_score = self
+                .cost_optimizer
+                .get_account_cost_score(account.id, &metrics)
+                .await;
+
             // 如果请求成本敏感，给予更高权重
             let adjusted_score = if ctx.cost_sensitive {
                 cost_score * 2.0
             } else {
                 cost_score
             };
-            
+
             if adjusted_score < min_cost_score {
                 min_cost_score = adjusted_score;
                 best_account = Some(account);
             }
         }
 
-        best_account.map(|account| {
-            ScheduleResult {
-                account: account.clone(),
-                strategy_used: ScheduleStrategy::CostOptimized,
-                score: 1.0 - min_cost_score,
-                latency_estimate_ms: 0,
-                cost_estimate_cents: 0,
-            }
+        best_account.map(|account| ScheduleResult {
+            account: account.clone(),
+            strategy_used: ScheduleStrategy::CostOptimized,
+            score: 1.0 - min_cost_score,
+            latency_estimate_ms: 0,
+            cost_estimate_cents: 0,
         })
     }
 
@@ -538,26 +552,32 @@ impl Scheduler {
         for account in accounts {
             let metrics = self.metrics.get_or_create_account_metrics(account.id).await;
             let latency = metrics.get_avg_latency_ms();
-            
+
             if latency < min_latency {
                 min_latency = latency;
                 best_account = Some(account);
             }
         }
 
-        best_account.map(|account| {
-            ScheduleResult {
-                account: account.clone(),
-                strategy_used: ScheduleStrategy::LatencyOptimized,
-                score: if min_latency == 0 { 1.0 } else { 100.0 / min_latency as f64 },
-                latency_estimate_ms: min_latency,
-                cost_estimate_cents: 0,
-            }
+        best_account.map(|account| ScheduleResult {
+            account: account.clone(),
+            strategy_used: ScheduleStrategy::LatencyOptimized,
+            score: if min_latency == 0 {
+                1.0
+            } else {
+                100.0 / min_latency as f64
+            },
+            latency_estimate_ms: min_latency,
+            cost_estimate_cents: 0,
         })
     }
 
     /// 自适应选择
-    async fn select_adaptive(&self, accounts: &[AccountInfo], _ctx: &ScheduleContext) -> Option<ScheduleResult> {
+    async fn select_adaptive(
+        &self,
+        accounts: &[AccountInfo],
+        _ctx: &ScheduleContext,
+    ) -> Option<ScheduleResult> {
         if accounts.is_empty() {
             return None;
         }
@@ -568,46 +588,47 @@ impl Scheduler {
 
         for account in accounts {
             let metrics = self.metrics.get_or_create_account_metrics(account.id).await;
-            
+
             // 计算综合分数
             let mut score = 0.0;
-            
+
             // 1. 连接数权重（越少越好）
             let connections = metrics.get_active_connections() as f64;
             let connection_score = 1.0 - (connections / 100.0).min(1.0);
             score += connection_score * 0.3;
-            
+
             // 2. 延迟权重（越低越好）
             let latency = metrics.get_avg_latency_ms() as f64;
             let latency_score = if latency == 0.0 { 1.0 } else { 100.0 / latency };
             score += latency_score * 0.3;
-            
+
             // 3. 成本权重（越低越好）
-            let cost_score = self.cost_optimizer.get_account_cost_score(account.id, &metrics).await;
+            let cost_score = self
+                .cost_optimizer
+                .get_account_cost_score(account.id, &metrics)
+                .await;
             score += (1.0 - cost_score) * 0.2;
-            
+
             // 4. 成功率权重
             let success_rate = metrics.get_success_rate();
             score += success_rate * 0.15;
-            
+
             // 5. 优先级权重
             let priority_score = (account.priority as f64 + 1.0) / 11.0;
             score += priority_score * 0.05;
-            
+
             if score > best_score {
                 best_score = score;
                 best_account = Some(account);
             }
         }
 
-        best_account.map(|account| {
-            ScheduleResult {
-                account: account.clone(),
-                strategy_used: ScheduleStrategy::Adaptive,
-                score: best_score,
-                latency_estimate_ms: 0,
-                cost_estimate_cents: 0,
-            }
+        best_account.map(|account| ScheduleResult {
+            account: account.clone(),
+            strategy_used: ScheduleStrategy::Adaptive,
+            score: best_score,
+            latency_estimate_ms: 0,
+            cost_estimate_cents: 0,
         })
     }
 
@@ -623,11 +644,16 @@ impl Scheduler {
         output_tokens: u64,
     ) {
         let metrics = self.metrics.get_or_create_account_metrics(account_id).await;
-        
+
         if success {
             let cost = if self.config.enable_cost_optimization {
                 // 需要获取 provider 信息，这里简化处理
-                self.cost_optimizer.calculate_cost("unknown", "unknown", input_tokens, output_tokens)
+                self.cost_optimizer.calculate_cost(
+                    "unknown",
+                    "unknown",
+                    input_tokens,
+                    output_tokens,
+                )
             } else {
                 0
             };
@@ -658,10 +684,10 @@ impl Scheduler {
         let accounts = self.accounts.read().await;
         let active_count = accounts.iter().filter(|a| a.status.is_available()).count();
         let total_count = accounts.len();
-        
+
         let sessions = self.sticky_sessions.read().await;
         let sticky_count = sessions.len();
-        
+
         let cooldown = self.account_cooldown.read().await;
         let cooldown_count = cooldown.len();
 
@@ -679,7 +705,7 @@ impl Scheduler {
     pub async fn cleanup_expired_sessions(&self) {
         let mut sessions = self.sticky_sessions.write().await;
         let now = Utc::now();
-        
+
         sessions.retain(|_, session| {
             (now - session.last_accessed).num_seconds() <= self.config.sticky_session_ttl_secs
         });
@@ -689,10 +715,8 @@ impl Scheduler {
     pub async fn cleanup_expired_cooldowns(&self) {
         let mut cooldown = self.account_cooldown.write().await;
         let now = Utc::now();
-        
-        cooldown.retain(|_, time| {
-            (now - *time).num_seconds() < self.config.account_cooldown_secs
-        });
+
+        cooldown.retain(|_, time| (now - *time).num_seconds() < self.config.account_cooldown_secs);
     }
 }
 
@@ -728,7 +752,7 @@ mod tests {
     async fn test_scheduler_creation() {
         let scheduler = Scheduler::new(SchedulerConfig::default());
         let stats = scheduler.get_stats().await;
-        
+
         assert_eq!(stats.total_accounts, 0);
         assert_eq!(stats.current_strategy, ScheduleStrategy::RoundRobin);
     }
@@ -737,13 +761,13 @@ mod tests {
     async fn test_add_remove_account() {
         let scheduler = Scheduler::new(SchedulerConfig::default());
         let account_id = Uuid::new_v4();
-        
+
         let account = create_test_account(account_id, "test-account", 5);
         scheduler.add_account(account).await;
-        
+
         let accounts = scheduler.get_accounts().await;
         assert_eq!(accounts.len(), 1);
-        
+
         scheduler.remove_account(account_id).await;
         let accounts = scheduler.get_accounts().await;
         assert_eq!(accounts.len(), 0);
@@ -752,26 +776,26 @@ mod tests {
     #[tokio::test]
     async fn test_round_robin_selection() {
         let scheduler = Scheduler::new(SchedulerConfig::default());
-        
+
         // 添加多个账号
         for i in 0..3 {
             let account = create_test_account(Uuid::new_v4(), &format!("account-{}", i), i);
             scheduler.add_account(account).await;
         }
-        
+
         // 选择应该轮询
         let ctx = ScheduleContext::default();
-        
+
         let result1 = scheduler.select(&ctx).await;
         let result2 = scheduler.select(&ctx).await;
         let result3 = scheduler.select(&ctx).await;
         let result4 = scheduler.select(&ctx).await;
-        
+
         assert!(result1.is_some());
         assert!(result2.is_some());
         assert!(result3.is_some());
         assert!(result4.is_some());
-        
+
         // 验证轮询顺序
         assert_ne!(result1.unwrap().account.id, result2.unwrap().account.id);
     }
@@ -781,21 +805,25 @@ mod tests {
         let mut config = SchedulerConfig::default();
         config.default_strategy = ScheduleStrategy::LeastConnection;
         let scheduler = Scheduler::new(config);
-        
+
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
-        
-        scheduler.add_account(create_test_account(id1, "account-1", 1)).await;
-        scheduler.add_account(create_test_account(id2, "account-2", 1)).await;
-        
+
+        scheduler
+            .add_account(create_test_account(id1, "account-1", 1))
+            .await;
+        scheduler
+            .add_account(create_test_account(id2, "account-2", 1))
+            .await;
+
         // 模拟第一个账号有更多连接
         let metrics1 = scheduler.metrics.get_or_create_account_metrics(id1).await;
         metrics1.record_request_start();
         metrics1.record_request_start();
-        
+
         let ctx = ScheduleContext::default();
         let result = scheduler.select(&ctx).await;
-        
+
         assert!(result.is_some());
         // 应该选择连接更少的账号
         assert_eq!(result.unwrap().account.id, id2);
@@ -806,21 +834,25 @@ mod tests {
         let mut config = SchedulerConfig::default();
         config.default_strategy = ScheduleStrategy::LatencyOptimized;
         let scheduler = Scheduler::new(config);
-        
+
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
-        
-        scheduler.add_account(create_test_account(id1, "account-1", 1)).await;
-        scheduler.add_account(create_test_account(id2, "account-2", 1)).await;
-        
+
+        scheduler
+            .add_account(create_test_account(id1, "account-1", 1))
+            .await;
+        scheduler
+            .add_account(create_test_account(id2, "account-2", 1))
+            .await;
+
         // 模拟第二个账号延迟更低
         let metrics2 = scheduler.metrics.get_or_create_account_metrics(id2).await;
         metrics2.record_request_start();
         metrics2.record_request_success(50, None).await;
-        
+
         let ctx = ScheduleContext::default();
         let result = scheduler.select(&ctx).await;
-        
+
         assert!(result.is_some());
         // 应该选择延迟更低的账号
         assert_eq!(result.unwrap().account.id, id2);
@@ -830,19 +862,21 @@ mod tests {
     async fn test_sticky_session() {
         let scheduler = Scheduler::new(SchedulerConfig::default());
         let account_id = Uuid::new_v4();
-        
-        scheduler.add_account(create_test_account(account_id, "test-account", 1)).await;
-        
+
+        scheduler
+            .add_account(create_test_account(account_id, "test-account", 1))
+            .await;
+
         let ctx = ScheduleContext {
             session_id: Some("session-123".to_string()),
             ..Default::default()
         };
-        
+
         // 第一次选择
         let result1 = scheduler.select(&ctx).await;
         assert!(result1.is_some());
         let selected_id = result1.unwrap().account.id;
-        
+
         // 第二次选择应该返回相同账号（粘性会话）
         let result2 = scheduler.select(&ctx).await;
         assert!(result2.is_some());
@@ -852,31 +886,42 @@ mod tests {
     #[tokio::test]
     async fn test_strategy_change() {
         let scheduler = Scheduler::new(SchedulerConfig::default());
-        
+
         assert_eq!(scheduler.get_strategy().await, ScheduleStrategy::RoundRobin);
-        
-        scheduler.set_strategy(ScheduleStrategy::LeastConnection).await;
-        assert_eq!(scheduler.get_strategy().await, ScheduleStrategy::LeastConnection);
+
+        scheduler
+            .set_strategy(ScheduleStrategy::LeastConnection)
+            .await;
+        assert_eq!(
+            scheduler.get_strategy().await,
+            ScheduleStrategy::LeastConnection
+        );
     }
 
     #[tokio::test]
     async fn test_cooldown() {
         let scheduler = Scheduler::new(SchedulerConfig::default());
         let account_id = Uuid::new_v4();
-        
-        scheduler.add_account(create_test_account(account_id, "test-account", 1)).await;
-        
+
+        scheduler
+            .add_account(create_test_account(account_id, "test-account", 1))
+            .await;
+
         // 设置冷却
         scheduler.set_cooldown(account_id).await;
-        
+
         // 此时账号应该不可选
         let ctx = ScheduleContext::default();
         let result = scheduler.select(&ctx).await;
-        
+
         // 因为只有一个账号且在冷却中，应该返回 None
         // 注意：实际实现中 is_in_cooldown_sync 可能返回 false
         // 这里主要测试冷却机制存在
-        assert!(scheduler.account_cooldown.read().await.contains_key(&account_id));
+        assert!(scheduler
+            .account_cooldown
+            .read()
+            .await
+            .contains_key(&account_id));
     }
 
     #[tokio::test]
@@ -889,18 +934,20 @@ mod tests {
             ScheduleStrategy::LatencyOptimized,
             ScheduleStrategy::Adaptive,
         ];
-        
+
         let mut config = SchedulerConfig::default();
-        
+
         for strategy in strategies {
             config.default_strategy = strategy;
             let scheduler = Scheduler::new(config.clone());
-            
-            scheduler.add_account(create_test_account(Uuid::new_v4(), "test", 1)).await;
-            
+
+            scheduler
+                .add_account(create_test_account(Uuid::new_v4(), "test", 1))
+                .await;
+
             let ctx = ScheduleContext::default();
             let result = scheduler.select(&ctx).await;
-            
+
             assert!(result.is_some());
             assert_eq!(result.unwrap().strategy_used, strategy);
         }
@@ -909,7 +956,10 @@ mod tests {
     #[test]
     fn test_schedule_strategy_display() {
         assert_eq!(format!("{}", ScheduleStrategy::RoundRobin), "RoundRobin");
-        assert_eq!(format!("{}", ScheduleStrategy::LeastConnection), "LeastConnection");
+        assert_eq!(
+            format!("{}", ScheduleStrategy::LeastConnection),
+            "LeastConnection"
+        );
         assert_eq!(format!("{}", ScheduleStrategy::Adaptive), "Adaptive");
     }
 

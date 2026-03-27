@@ -6,22 +6,25 @@
 //! - 安全的 Token 轮换机制
 //! - TOTP 两步验证支持
 
-use anyhow::{Result, bail};
-use argon2::{password_hash::{rand_core::OsRng, PasswordHasher, PasswordHash, PasswordVerifier, SaltString}, Argon2};
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
-use serde::{Deserialize, Serialize};
-use sea_orm::{
-    EntityTrait, QueryFilter, ColumnTrait, ActiveModelTrait, Set, 
-    DatabaseConnection, ActiveValue, QuerySelect, PaginatorTrait,
+use anyhow::{bail, Result};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
 };
-use uuid::Uuid;
 use chrono::{Duration, Utc};
-use sha2::{Sha256, Digest};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QuerySelect, Set,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
+use uuid::Uuid;
 
-use crate::entity::{users, refresh_tokens};
-use crate::db::RedisPool;
 use super::totp::TotpService;
+use crate::db::RedisPool;
+use crate::entity::{refresh_tokens, users};
 
 /// Access Token 的 Claims
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -113,11 +116,7 @@ pub struct UserService {
 
 impl UserService {
     /// 创建新的用户服务
-    pub fn new(
-        db: DatabaseConnection, 
-        jwt_secret: String, 
-        jwt_expire_hours: u64,
-    ) -> Self {
+    pub fn new(db: DatabaseConnection, jwt_secret: String, jwt_expire_hours: u64) -> Self {
         Self {
             db,
             redis: None,
@@ -193,8 +192,8 @@ impl UserService {
 
     /// 用户登录（返回 Token 对，支持 TOTP）
     pub async fn login(
-        &self, 
-        email: &str, 
+        &self,
+        email: &str,
         password: &str,
         user_agent: Option<String>,
         ip_address: Option<String>,
@@ -236,8 +235,10 @@ impl UserService {
             })
         } else {
             // 生成 Token 对
-            let token_pair = self.generate_token_pair(&user, user_agent, ip_address).await?;
-            
+            let token_pair = self
+                .generate_token_pair(&user, user_agent, ip_address)
+                .await?;
+
             Ok(LoginResponse::Success {
                 access_token: token_pair.access_token,
                 refresh_token: token_pair.refresh_token,
@@ -258,7 +259,7 @@ impl UserService {
     ) -> Result<(UserInfo, TokenPair)> {
         // 验证临时 token
         let claims = self.verify_temp_token(temp_token)?;
-        
+
         // 获取用户
         let user_id = Uuid::parse_str(&claims.sub)?;
         let user = users::Entity::find_by_id(user_id)
@@ -272,7 +273,9 @@ impl UserService {
         }
 
         // 获取 TOTP secret
-        let secret = user.totp_secret.as_ref()
+        let secret = user
+            .totp_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("TOTP secret not found"))?;
 
         // 验证 TOTP 代码
@@ -281,7 +284,9 @@ impl UserService {
         }
 
         // 生成完整 Token 对
-        let token_pair = self.generate_token_pair(&user, user_agent, ip_address).await?;
+        let token_pair = self
+            .generate_token_pair(&user, user_agent, ip_address)
+            .await?;
 
         Ok((
             UserInfo {
@@ -307,7 +312,7 @@ impl UserService {
     ) -> Result<(UserInfo, TokenPair)> {
         // 验证临时 token
         let claims = self.verify_temp_token(temp_token)?;
-        
+
         // 获取用户
         let user_id = Uuid::parse_str(&claims.sub)?;
         let user = users::Entity::find_by_id(user_id)
@@ -323,7 +328,7 @@ impl UserService {
         // 验证备用码
         let backup_codes = self.get_backup_codes(user_id).await?;
         let code_hash = TotpService::hash_backup_code(backup_code);
-        
+
         if !backup_codes.iter().any(|h| h == &code_hash) {
             bail!("Invalid backup code");
         }
@@ -332,7 +337,9 @@ impl UserService {
         self.remove_backup_code(user_id, &code_hash).await?;
 
         // 生成完整 Token 对
-        let token_pair = self.generate_token_pair(&user, user_agent, ip_address).await?;
+        let token_pair = self
+            .generate_token_pair(&user, user_agent, ip_address)
+            .await?;
 
         Ok((
             UserInfo {
@@ -393,48 +400,55 @@ impl UserService {
         }
 
         // 撤销旧的 refresh token（安全轮换）
-        self.revoke_refresh_token_by_id(stored_token.id, Some("Token rotation".to_string())).await?;
+        self.revoke_refresh_token_by_id(stored_token.id, Some("Token rotation".to_string()))
+            .await?;
 
         // 将旧的 refresh token 加入黑名单
-        self.add_refresh_token_to_blacklist(&claims.jti, stored_token.expires_at).await?;
+        self.add_refresh_token_to_blacklist(&claims.jti, stored_token.expires_at)
+            .await?;
 
         // 生成新的 Token 对
-        let token_pair = self.generate_token_pair(&user, user_agent, ip_address).await?;
+        let token_pair = self
+            .generate_token_pair(&user, user_agent, ip_address)
+            .await?;
 
         Ok(token_pair)
     }
 
     /// 登出（撤销 refresh token 和将 access token 加入黑名单）
-    pub async fn logout(
-        &self,
-        access_token: &str,
-        refresh_token: Option<&str>,
-    ) -> Result<()> {
+    pub async fn logout(&self, access_token: &str, refresh_token: Option<&str>) -> Result<()> {
         // 将 access token 加入黑名单
         if let Ok(claims) = self.verify_token(access_token) {
             let exp = chrono::DateTime::from_timestamp(claims.exp, 0)
                 .unwrap_or_else(|| Utc::now() + Duration::hours(self.jwt_expire_hours as i64));
-            self.add_token_to_blacklist(&claims.sub, &claims.jti.unwrap_or_default(), exp).await?;
+            self.add_token_to_blacklist(&claims.sub, &claims.jti.unwrap_or_default(), exp)
+                .await?;
         }
 
         // 撤销 refresh token
         if let Some(refresh_token) = refresh_token {
             if let Ok(claims) = self.verify_refresh_token(refresh_token) {
                 let token_hash = self.hash_token(refresh_token);
-                
+
                 // 撤销数据库中的 token
                 if let Some(stored_token) = refresh_tokens::Entity::find()
                     .filter(refresh_tokens::Column::TokenHash.eq(&token_hash))
                     .one(&self.db)
-                    .await? 
+                    .await?
                 {
-                    self.revoke_refresh_token_by_id(stored_token.id, Some("User logout".to_string())).await?;
+                    self.revoke_refresh_token_by_id(
+                        stored_token.id,
+                        Some("User logout".to_string()),
+                    )
+                    .await?;
                 }
 
                 // 加入黑名单
-                self.add_refresh_token_to_blacklist(&claims.jti, 
-                    chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_else(|| Utc::now())
-                ).await?;
+                self.add_refresh_token_to_blacklist(
+                    &claims.jti,
+                    chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_else(|| Utc::now()),
+                )
+                .await?;
             }
         }
 
@@ -442,7 +456,11 @@ impl UserService {
     }
 
     /// 撤销用户的所有 refresh token
-    pub async fn revoke_all_user_tokens(&self, user_id: Uuid, reason: Option<String>) -> Result<u64> {
+    pub async fn revoke_all_user_tokens(
+        &self,
+        user_id: Uuid,
+        reason: Option<String>,
+    ) -> Result<u64> {
         let tokens = refresh_tokens::Entity::find()
             .filter(refresh_tokens::Column::UserId.eq(user_id))
             .filter(refresh_tokens::Column::Revoked.eq(false))
@@ -452,15 +470,22 @@ impl UserService {
         let count = tokens.len() as u64;
 
         for token in tokens {
-            self.revoke_refresh_token_by_id(token.id, reason.clone()).await?;
-            
+            self.revoke_refresh_token_by_id(token.id, reason.clone())
+                .await?;
+
             // 将 token 的 jti 加入黑名单（如果有存储的话）
             // 这里我们使用 token_hash 作为标识
             if let Some(ref redis) = self.redis {
                 let key = format!("{}:{}", REFRESH_TOKEN_BLACKLIST_PREFIX, token.token_hash);
-                let _ = redis.set(&key, "1", Some(std::time::Duration::from_secs(
-                    (token.expires_at - Utc::now()).num_seconds().max(0) as u64
-                ))).await;
+                let _ = redis
+                    .set(
+                        &key,
+                        "1",
+                        Some(std::time::Duration::from_secs(
+                            (token.expires_at - Utc::now()).num_seconds().max(0) as u64,
+                        )),
+                    )
+                    .await;
             }
         }
 
@@ -489,7 +514,8 @@ impl UserService {
             &refresh_jti,
             user_agent,
             ip_address,
-        ).await?;
+        )
+        .await?;
 
         let access_expires_in = self.jwt_expire_hours * 3600;
         let refresh_expires_in = self.refresh_token_expire_days * 24 * 3600;
@@ -506,7 +532,7 @@ impl UserService {
     fn generate_access_token_with_jti(&self, user: &users::Model, jti: &str) -> Result<String> {
         let now = Utc::now();
         let exp = now + Duration::hours(self.jwt_expire_hours as i64);
-        
+
         let claims = Claims {
             sub: user.id.to_string(),
             email: user.email.clone(),
@@ -530,7 +556,7 @@ impl UserService {
     fn generate_refresh_token(&self, user_id: Uuid, jti: &str) -> Result<String> {
         let now = Utc::now();
         let exp = now + Duration::days(self.refresh_token_expire_days as i64);
-        
+
         let claims = RefreshClaims {
             sub: user_id.to_string(),
             jti: jti.to_string(),
@@ -608,7 +634,10 @@ impl UserService {
         let claims = self.verify_token(token)?;
 
         // 检查黑名单
-        if self.is_token_blacklisted(&claims.sub, &claims.jti.clone().unwrap_or_default()).await? {
+        if self
+            .is_token_blacklisted(&claims.sub, &claims.jti.clone().unwrap_or_default())
+            .await?
+        {
             bail!("Token has been revoked");
         }
 
@@ -628,17 +657,19 @@ impl UserService {
 
     /// 将 Access Token 加入黑名单
     async fn add_token_to_blacklist(
-        &self, 
-        user_id: &str, 
+        &self,
+        user_id: &str,
         jti: &str,
         expires_at: chrono::DateTime<Utc>,
     ) -> Result<()> {
         if let Some(ref redis) = self.redis {
             let key = format!("{}:{}", TOKEN_BLACKLIST_PREFIX, jti);
             let ttl = (expires_at - Utc::now()).num_seconds().max(0);
-            
+
             if ttl > 0 {
-                redis.set(&key, "1", Some(std::time::Duration::from_secs(ttl as u64))).await?;
+                redis
+                    .set(&key, "1", Some(std::time::Duration::from_secs(ttl as u64)))
+                    .await?;
             }
         }
         Ok(())
@@ -655,16 +686,18 @@ impl UserService {
 
     /// 将 Refresh Token 加入黑名单
     async fn add_refresh_token_to_blacklist(
-        &self, 
+        &self,
         jti: &str,
         expires_at: chrono::DateTime<Utc>,
     ) -> Result<()> {
         if let Some(ref redis) = self.redis {
             let key = format!("{}:{}", REFRESH_TOKEN_BLACKLIST_PREFIX, jti);
             let ttl = (expires_at - Utc::now()).num_seconds().max(0);
-            
+
             if ttl > 0 {
-                redis.set(&key, "1", Some(std::time::Duration::from_secs(ttl as u64))).await?;
+                redis
+                    .set(&key, "1", Some(std::time::Duration::from_secs(ttl as u64)))
+                    .await?;
             }
         }
         Ok(())
@@ -688,9 +721,7 @@ impl UserService {
 
     /// 根据 ID 获取用户
     pub async fn get_by_id(&self, id: Uuid) -> Result<Option<UserInfo>> {
-        let user = users::Entity::find_by_id(id)
-            .one(&self.db)
-            .await?;
+        let user = users::Entity::find_by_id(id).one(&self.db).await?;
 
         Ok(user.map(|u| UserInfo {
             id: u.id,
@@ -731,15 +762,18 @@ impl UserService {
             .fetch_page(page.saturating_sub(1))
             .await?;
 
-        Ok(users.into_iter().map(|u| UserInfo {
-            id: u.id,
-            email: u.email,
-            role: u.role,
-            status: u.status,
-            balance: u.balance,
-            totp_enabled: u.totp_enabled,
-            created_at: u.created_at,
-        }).collect())
+        Ok(users
+            .into_iter()
+            .map(|u| UserInfo {
+                id: u.id,
+                email: u.email,
+                role: u.role,
+                status: u.status,
+                balance: u.balance,
+                totp_enabled: u.totp_enabled,
+                created_at: u.created_at,
+            })
+            .collect())
     }
 
     /// 生成 JWT Token（兼容旧接口）
@@ -751,7 +785,7 @@ impl UserService {
     pub fn generate_token_for(&self, user: &UserInfo) -> Result<String> {
         let now = Utc::now();
         let exp = now + Duration::hours(self.jwt_expire_hours as i64);
-        
+
         let claims = Claims {
             sub: user.id.to_string(),
             email: user.email.clone(),
@@ -783,17 +817,19 @@ impl UserService {
     fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
         let parsed_hash = PasswordHash::new(hash)?;
         let argon2 = Argon2::default();
-        Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
+        Ok(argon2
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
 
     /// 清理过期的 refresh tokens
     pub async fn cleanup_expired_tokens(&self) -> Result<u64> {
         let now = Utc::now();
-        
+
         let result = sea_orm::EntityTrait::delete_many(
             refresh_tokens::Entity::find()
                 .filter(refresh_tokens::Column::ExpiresAt.lt(now))
-                .filter(refresh_tokens::Column::Revoked.eq(true))
+                .filter(refresh_tokens::Column::Revoked.eq(true)),
         )
         .exec(&self.db)
         .await?;
@@ -855,7 +891,9 @@ impl UserService {
             bail!("TOTP already enabled for this account");
         }
 
-        let secret = user.totp_secret.as_ref()
+        let secret = user
+            .totp_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("TOTP secret not set. Please enable TOTP first."))?;
 
         // 验证 TOTP 代码
@@ -883,7 +921,9 @@ impl UserService {
             bail!("TOTP not enabled for this account");
         }
 
-        let secret = user.totp_secret.as_ref()
+        let secret = user
+            .totp_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("TOTP secret not found"))?;
 
         // 验证 TOTP 代码或备用码
@@ -922,7 +962,9 @@ impl UserService {
             bail!("TOTP not enabled for this account");
         }
 
-        let secret = user.totp_secret.as_ref()
+        let secret = user
+            .totp_secret
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("TOTP secret not found"))?;
 
         Ok(TotpService::verify_code(secret, code))
@@ -969,7 +1011,7 @@ impl UserService {
     fn generate_temp_token(&self, user: &users::Model) -> Result<String> {
         let now = Utc::now();
         let exp = now + Duration::minutes(5); // 5 分钟有效期
-        
+
         let claims = Claims {
             sub: user.id.to_string(),
             email: user.email.clone(),
@@ -992,7 +1034,7 @@ impl UserService {
     /// 验证临时 token
     fn verify_temp_token(&self, token: &str) -> Result<Claims> {
         let claims = self.verify_token(token)?;
-        
+
         if !claims.is_temp {
             bail!("Invalid token: expected temporary token");
         }
@@ -1004,12 +1046,19 @@ impl UserService {
     async fn store_backup_codes(&self, user_id: Uuid, codes: &[String]) -> Result<()> {
         if let Some(ref redis) = self.redis {
             let key = format!("totp_backup_codes:{}", user_id);
-            let hashes: Vec<String> = codes.iter()
+            let hashes: Vec<String> = codes
+                .iter()
                 .map(|c| TotpService::hash_backup_code(c))
                 .collect();
             let value = serde_json::to_string(&hashes)?;
             // 存储 30 天
-            redis.set(&key, &value, Some(std::time::Duration::from_secs(30 * 24 * 3600))).await?;
+            redis
+                .set(
+                    &key,
+                    &value,
+                    Some(std::time::Duration::from_secs(30 * 24 * 3600)),
+                )
+                .await?;
         }
         Ok(())
     }
@@ -1033,7 +1082,13 @@ impl UserService {
                 let mut hashes: Vec<String> = serde_json::from_str(&value).unwrap_or_default();
                 hashes.retain(|h| h != code_hash);
                 let new_value = serde_json::to_string(&hashes)?;
-                redis.set(&key, &new_value, Some(std::time::Duration::from_secs(30 * 24 * 3600))).await?;
+                redis
+                    .set(
+                        &key,
+                        &new_value,
+                        Some(std::time::Duration::from_secs(30 * 24 * 3600)),
+                    )
+                    .await?;
             }
         }
         Ok(())
@@ -1075,7 +1130,7 @@ mod tests {
 
         // 相同 token 应该产生相同 hash
         assert_eq!(hash1, hash2);
-        
+
         // 不同 token 应该产生不同 hash
         let hash3 = service.hash_token("different-token");
         assert_ne!(hash1, hash3);
@@ -1159,6 +1214,8 @@ mod tests {
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("temp_token"));
-        assert!(json.contains("requires_totp").or_else(|| json.contains("temp_token")));
+        assert!(json
+            .contains("requires_totp")
+            .or_else(|| json.contains("temp_token")));
     }
 }

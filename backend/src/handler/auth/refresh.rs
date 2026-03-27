@@ -5,16 +5,15 @@
 //! - POST /auth/logout - 登出并撤销 token
 
 use axum::{
-    Extension,
-    Json,
-    http::{StatusCode, HeaderMap},
+    http::{HeaderMap, StatusCode},
+    Extension, Json,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::db::RedisPool;
 use crate::gateway::SharedState;
 use crate::service::user::UserService;
-use crate::db::RedisPool;
 
 /// 刷新 Token 请求
 #[derive(Debug, Deserialize)]
@@ -65,7 +64,8 @@ impl axum::response::IntoResponse for ApiError {
                 StatusCode::NOT_FOUND => "NOT_FOUND",
                 StatusCode::INTERNAL_SERVER_ERROR => "INTERNAL_ERROR",
                 _ => "ERROR",
-            }.to_string(),
+            }
+            .to_string(),
         });
         (self.0, body).into_response()
     }
@@ -90,14 +90,14 @@ fn extract_ip_address(headers: &HeaderMap) -> Option<String> {
             }
         }
     }
-    
+
     // 尝试从 X-Real-IP 获取
     if let Some(real_ip) = headers.get("x-real-ip") {
         if let Ok(ip) = real_ip.to_str() {
             return Some(ip.to_string());
         }
     }
-    
+
     None
 }
 
@@ -116,7 +116,7 @@ fn extract_access_token(headers: &HeaderMap) -> Option<String> {
 }
 
 /// POST /auth/refresh - 刷新 Access Token
-/// 
+///
 /// 使用 refresh token 获取新的 access token 和 refresh token。
 /// 旧的 refresh token 会被自动撤销（安全轮换）。
 pub async fn refresh(
@@ -159,7 +159,7 @@ pub async fn refresh(
 }
 
 /// POST /auth/logout - 登出
-/// 
+///
 /// 撤销 refresh token 并将 access token 加入黑名单。
 /// 客户端应该删除本地存储的所有 token。
 pub async fn logout(
@@ -191,7 +191,7 @@ pub async fn logout(
 }
 
 /// POST /auth/logout-all - 登出所有设备
-/// 
+///
 /// 撤销用户的所有 refresh token，强制所有设备重新登录。
 pub async fn logout_all(
     Extension(state): Extension<SharedState>,
@@ -227,7 +227,7 @@ mod tests {
     fn test_extract_user_agent() {
         let mut headers = HeaderMap::new();
         headers.insert("user-agent", "Mozilla/5.0".parse().unwrap());
-        
+
         let ua = extract_user_agent(&headers);
         assert_eq!(ua, Some("Mozilla/5.0".to_string()));
     }
@@ -236,7 +236,7 @@ mod tests {
     fn test_extract_ip_from_x_forwarded_for() {
         let mut headers = HeaderMap::new();
         headers.insert("x-forwarded-for", "192.168.1.1, 10.0.0.1".parse().unwrap());
-        
+
         let ip = extract_ip_address(&headers);
         assert_eq!(ip, Some("192.168.1.1".to_string()));
     }
@@ -245,7 +245,7 @@ mod tests {
     fn test_extract_ip_from_x_real_ip() {
         let mut headers = HeaderMap::new();
         headers.insert("x-real-ip", "192.168.1.2".parse().unwrap());
-        
+
         let ip = extract_ip_address(&headers);
         assert_eq!(ip, Some("192.168.1.2".to_string()));
     }
@@ -254,7 +254,7 @@ mod tests {
     fn test_extract_access_token() {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", "Bearer my-token-123".parse().unwrap());
-        
+
         let token = extract_access_token(&headers);
         assert_eq!(token, Some("my-token-123".to_string()));
     }

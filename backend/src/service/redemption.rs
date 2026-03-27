@@ -1,6 +1,6 @@
 //! 兑换码系统
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
@@ -66,12 +66,12 @@ impl RedemptionService {
             code_length: 16,
         }
     }
-    
+
     /// 生成兑换码
     pub fn generate_code(&self) -> String {
         use rand::Rng;
         const CHARSET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        
+
         let mut rng = rand::thread_rng();
         let code: String = (0..self.code_length)
             .map(|_| {
@@ -79,10 +79,10 @@ impl RedemptionService {
                 CHARSET[idx] as char
             })
             .collect();
-        
+
         format!("{}-{}", self.code_prefix, code)
     }
-    
+
     /// 创建余额兑换码
     pub async fn create_balance_code(
         &self,
@@ -106,11 +106,11 @@ impl RedemptionService {
             is_active: true,
             notes,
         };
-        
+
         // TODO: 保存到数据库
         Ok(code)
     }
-    
+
     /// 创建订阅兑换码
     pub async fn create_subscription_code(
         &self,
@@ -135,10 +135,10 @@ impl RedemptionService {
             is_active: true,
             notes,
         };
-        
+
         Ok(code)
     }
-    
+
     /// 创建配额兑换码
     pub async fn create_quota_code(
         &self,
@@ -162,38 +162,40 @@ impl RedemptionService {
             is_active: true,
             notes,
         };
-        
+
         Ok(code)
     }
-    
+
     /// 兑换
     pub async fn redeem(&self, code_str: &str, user_id: Uuid) -> Result<RedemptionResult> {
         // 1. 验证兑换码
-        let code = self.find_code(code_str).await?
+        let code = self
+            .find_code(code_str)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("Invalid code"))?;
-        
+
         // 2. 检查是否有效
         if !code.is_active {
             bail!("Code is inactive");
         }
-        
+
         // 3. 检查使用次数
         if code.current_uses >= code.max_uses {
             bail!("Code has reached maximum uses");
         }
-        
+
         // 4. 检查过期时间
         if let Some(expires_at) = code.expires_at {
             if Utc::now() > expires_at {
                 bail!("Code has expired");
             }
         }
-        
+
         // 5. 检查用户是否已使用过
         if self.has_user_redeemed(code.id, user_id).await? {
             bail!("You have already redeemed this code");
         }
-        
+
         // 6. 执行兑换
         let result = match code.code_type {
             RedemptionCodeType::Balance => {
@@ -221,40 +223,40 @@ impl RedemptionService {
                 }
             }
         };
-        
+
         // 7. 更新使用次数
         self.increment_usage(code.id).await?;
-        
+
         // 8. 记录兑换
         self.record_redemption(code.id, user_id, code.value).await?;
-        
+
         Ok(result)
     }
-    
+
     /// 查找兑换码
     async fn find_code(&self, _code: &str) -> Result<Option<RedemptionCode>> {
         // TODO: 从数据库查询
         Ok(None)
     }
-    
+
     /// 检查用户是否已兑换
     async fn has_user_redeemed(&self, _code_id: Uuid, _user_id: Uuid) -> Result<bool> {
         // TODO: 从数据库查询
         Ok(false)
     }
-    
+
     /// 增加使用次数
     async fn increment_usage(&self, _code_id: Uuid) -> Result<()> {
         // TODO: 更新数据库
         Ok(())
     }
-    
+
     /// 记录兑换
     async fn record_redemption(&self, _code_id: Uuid, _user_id: Uuid, _value: i64) -> Result<()> {
         // TODO: 插入数据库
         Ok(())
     }
-    
+
     /// 批量创建兑换码
     pub async fn create_batch(
         &self,
@@ -268,7 +270,7 @@ impl RedemptionService {
         notes: Option<String>,
     ) -> Result<Vec<RedemptionCode>> {
         let mut codes = Vec::new();
-        
+
         for _ in 0..count {
             let code = RedemptionCode {
                 id: Uuid::new_v4(),
@@ -286,16 +288,16 @@ impl RedemptionService {
             };
             codes.push(code);
         }
-        
+
         Ok(codes)
     }
-    
+
     /// 禁用兑换码
     pub async fn disable_code(&self, _code_id: Uuid) -> Result<()> {
         // TODO: 更新数据库
         Ok(())
     }
-    
+
     /// 获取兑换统计
     pub async fn get_stats(&self, _code_id: Uuid) -> Result<RedemptionStats> {
         Ok(RedemptionStats {
@@ -325,33 +327,33 @@ pub struct RedemptionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_redemption_code_type_display() {
         assert_eq!(RedemptionCodeType::Balance.to_string(), "balance");
         assert_eq!(RedemptionCodeType::Subscription.to_string(), "subscription");
         assert_eq!(RedemptionCodeType::Quota.to_string(), "quota");
     }
-    
+
     #[test]
     fn test_generate_code() {
         let service = RedemptionService::new(DatabaseConnection::default());
         let code = service.generate_code();
-        
+
         assert!(code.starts_with("FOX-"));
         assert_eq!(code.len(), 20); // "FOX-" (4) + 16
     }
-    
+
     #[test]
     fn test_generate_unique_codes() {
         let service = RedemptionService::new(DatabaseConnection::default());
-        
+
         let code1 = service.generate_code();
         let code2 = service.generate_code();
-        
+
         assert_ne!(code1, code2);
     }
-    
+
     #[test]
     fn test_redemption_code_creation() {
         let code = RedemptionCode {
@@ -368,12 +370,12 @@ mod tests {
             is_active: true,
             notes: Some("Test code".to_string()),
         };
-        
+
         assert_eq!(code.value, 1000);
         assert_eq!(code.max_uses, 10);
         assert!(code.is_active);
     }
-    
+
     #[test]
     fn test_redemption_result() {
         let result = RedemptionResult {
@@ -381,7 +383,7 @@ mod tests {
             value: 500,
             message: "Added 5.00 yuan to your balance".to_string(),
         };
-        
+
         assert_eq!(result.value, 500);
         assert!(result.message.contains("5.00"));
     }

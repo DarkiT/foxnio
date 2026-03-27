@@ -6,33 +6,26 @@
 //! - 密码重置
 //! - TOTP 两步验证
 
-pub mod refresh;
 pub mod password;
+pub mod refresh;
 pub mod totp;
 
 // 重新导出刷新相关函数
-pub use refresh::{refresh, logout, logout_all};
+pub use refresh::{logout, logout_all, refresh};
 
 // 重新导出 TOTP 相关函数
 pub use totp::{
-    enable_totp,
-    confirm_enable_totp,
-    disable_totp,
-    verify_totp,
-    get_totp_status,
-    regenerate_backup_codes,
-    totp_login,
-    backup_code_login,
+    backup_code_login, confirm_enable_totp, disable_totp, enable_totp, get_totp_status,
+    regenerate_backup_codes, totp_login, verify_totp,
 };
 
-use axum::{
-    Extension,
-    Json,
-    http::{StatusCode, HeaderMap},
-};
-use serde::{Deserialize, Serialize};
 use crate::gateway::SharedState;
 use crate::service::user::UserService;
+use axum::{
+    http::{HeaderMap, StatusCode},
+    Extension, Json,
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
@@ -136,13 +129,13 @@ fn extract_ip_address(headers: &HeaderMap) -> Option<String> {
             }
         }
     }
-    
+
     if let Some(real_ip) = headers.get("x-real-ip") {
         if let Ok(ip) = real_ip.to_str() {
             return Some(ip.to_string());
         }
     }
-    
+
     None
 }
 
@@ -157,7 +150,10 @@ pub async fn register(
     }
 
     if req.password.len() < 8 {
-        return Err(ApiError(StatusCode::BAD_REQUEST, "Password must be at least 8 characters".into()));
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Password must be at least 8 characters".into(),
+        ));
     }
 
     let user_agent = extract_user_agent(&headers);
@@ -170,11 +166,13 @@ pub async fn register(
         state.config.jwt.expire_hours,
     );
 
-    let user = user_service.register(&req.email, &req.password)
+    let user = user_service
+        .register(&req.email, &req.password)
         .await
         .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let token = user_service.generate_token_for(&user)
+    let token = user_service
+        .generate_token_for(&user)
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(RegisterResponse {
@@ -209,7 +207,8 @@ pub async fn login(
         state.config.jwt.expire_hours,
     );
 
-    let response = user_service.login(&req.email, &req.password, user_agent, ip_address)
+    let response = user_service
+        .login(&req.email, &req.password, user_agent, ip_address)
         .await
         .map_err(|e| {
             let msg = e.to_string();
@@ -242,19 +241,21 @@ pub async fn login(
                 message: None,
             }))
         }
-        crate::service::user::LoginResponse::RequiresTotp { temp_token, expires_in, message } => {
-            Ok(Json(AuthResponse {
-                access_token: None,
-                refresh_token: None,
-                token_type: "Bearer".to_string(),
-                expires_in: None,
-                refresh_expires_in: None,
-                user: None,
-                temp_token: Some(temp_token),
-                requires_totp: Some(true),
-                message: Some(message),
-            }))
-        }
+        crate::service::user::LoginResponse::RequiresTotp {
+            temp_token,
+            expires_in,
+            message,
+        } => Ok(Json(AuthResponse {
+            access_token: None,
+            refresh_token: None,
+            token_type: "Bearer".to_string(),
+            expires_in: None,
+            refresh_expires_in: None,
+            user: None,
+            temp_token: Some(temp_token),
+            requires_totp: Some(true),
+            message: Some(message),
+        })),
     }
 }
 
@@ -272,7 +273,8 @@ pub async fn get_me(
         state.config.jwt.expire_hours,
     );
 
-    let user = user_service.get_by_id(user_id)
+    let user = user_service
+        .get_by_id(user_id)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or(ApiError(StatusCode::NOT_FOUND, "User not found".into()))?;
@@ -308,7 +310,7 @@ mod tests {
     fn test_extract_user_agent() {
         let mut headers = HeaderMap::new();
         headers.insert("user-agent", "TestAgent/1.0".parse().unwrap());
-        
+
         let ua = extract_user_agent(&headers);
         assert_eq!(ua, Some("TestAgent/1.0".to_string()));
     }
@@ -317,7 +319,7 @@ mod tests {
     fn test_extract_ip_address() {
         let mut headers = HeaderMap::new();
         headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
-        
+
         let ip = extract_ip_address(&headers);
         assert_eq!(ip, Some("10.0.0.1".to_string()));
     }

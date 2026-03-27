@@ -2,34 +2,33 @@
 
 mod test;
 
-pub mod proxy;
-pub mod stream;
-pub mod middleware;
-pub mod routes;
-pub mod handler;
-pub mod failover;
 pub mod claude;
-pub mod scheduler;
+pub mod failover;
+pub mod handler;
+pub mod middleware;
 pub mod models;
+pub mod proxy;
+pub mod routes;
+pub mod scheduler;
+pub mod stream;
 
-pub use proxy::*;
-pub use stream::*;
-pub use middleware::*;
-pub use routes::build_app;
-pub use handler::GatewayHandler;
+pub use claude::{get_beta_header, ClaudeHeaders, TLSFingerprint};
 pub use failover::FailoverManager;
-pub use claude::{ClaudeHeaders, TLSFingerprint, get_beta_header};
+pub use handler::GatewayHandler;
+pub use middleware::*;
+pub use proxy::*;
+pub use routes::build_app;
 pub use scheduler::{
-    ScheduleStrategy, Scheduler, SchedulerConfig, AccountInfo, AccountStatus,
-    ScheduleContext, ScheduleResult, SchedulerStats,
-    SchedulerMetrics, AccountMetrics,
-    CostOptimizer, CostConfig, BudgetSummary,
+    AccountInfo, AccountMetrics, AccountStatus, BudgetSummary, CostConfig, CostOptimizer,
+    ScheduleContext, ScheduleResult, ScheduleStrategy, Scheduler, SchedulerConfig,
+    SchedulerMetrics, SchedulerStats,
 };
+pub use stream::*;
 
-use sea_orm::DatabaseConnection;
-use redis::aio::ConnectionManager;
-use std::sync::Arc;
 use crate::config::Config;
+use redis::aio::ConnectionManager;
+use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 
 pub struct AppState {
     pub db: DatabaseConnection,

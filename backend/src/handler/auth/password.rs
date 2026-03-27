@@ -1,15 +1,11 @@
 //! 密码重置处理器
 
-use axum::{
-    Extension,
-    Json,
-    http::StatusCode,
-};
-use serde::{Deserialize, Serialize};
+use super::ApiError;
 use crate::gateway::SharedState;
 use crate::service::email::SmtpEmailSender;
 use crate::service::password_reset::PasswordResetService;
-use super::ApiError;
+use axum::{http::StatusCode, Extension, Json};
+use serde::{Deserialize, Serialize};
 
 /// 请求密码重置
 #[derive(Debug, Deserialize)]
@@ -52,38 +48,32 @@ pub async fn request_reset(
     }
 
     // 获取邮件配置
-    let email_config = state.config.email.clone()
-        .unwrap_or_default();
+    let email_config = state.config.email.clone().unwrap_or_default();
 
     // 创建邮件发送器
-    let email_sender = SmtpEmailSender::new(email_config)
-        .map_err(|e| ApiError(
+    let email_sender = SmtpEmailSender::new(email_config).map_err(|e| {
+        ApiError(
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to initialize email sender: {}", e),
-        ))?;
+        )
+    })?;
 
     // 获取重置 URL 基础路径
-    let reset_url_base = state.config.email.as_ref()
+    let reset_url_base = state
+        .config
+        .email
+        .as_ref()
         .map(|c| c.reset_url_base.clone())
-        .unwrap_or_else(|| {
-            format!("http://localhost:{}", state.config.server.port)
-        });
+        .unwrap_or_else(|| format!("http://localhost:{}", state.config.server.port));
 
     // 创建密码重置服务
-    let reset_service = PasswordResetService::new(
-        state.db.clone(),
-        email_sender,
-        reset_url_base,
-    );
+    let reset_service = PasswordResetService::new(state.db.clone(), email_sender, reset_url_base);
 
     // 请求重置
     reset_service
         .request_reset(&req.email)
         .await
-        .map_err(|e| ApiError(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            e.to_string(),
-        ))?;
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // 无论邮箱是否存在，都返回成功（防止枚举攻击）
     Ok(Json(ResetResponse {
@@ -99,10 +89,12 @@ pub async fn verify_token(
     Json(req): Json<ResetPasswordRequest>,
 ) -> Result<Json<VerifyTokenResponse>, ApiError> {
     let email_sender = SmtpEmailSender::new(state.config.email.clone().unwrap_or_default())
-        .map_err(|e| ApiError(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to initialize email sender: {}", e),
-        ))?;
+        .map_err(|e| {
+            ApiError(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to initialize email sender: {}", e),
+            )
+        })?;
 
     let reset_service = PasswordResetService::new(
         state.db.clone(),
@@ -113,10 +105,7 @@ pub async fn verify_token(
     let valid = reset_service
         .verify_token(&req.token)
         .await
-        .map_err(|e| ApiError(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            e.to_string(),
-        ))?;
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(VerifyTokenResponse { valid }))
 }
@@ -136,10 +125,12 @@ pub async fn reset_password(
     }
 
     let email_sender = SmtpEmailSender::new(state.config.email.clone().unwrap_or_default())
-        .map_err(|e| ApiError(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to initialize email sender: {}", e),
-        ))?;
+        .map_err(|e| {
+            ApiError(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to initialize email sender: {}", e),
+            )
+        })?;
 
     let reset_service = PasswordResetService::new(
         state.db.clone(),
@@ -150,15 +141,17 @@ pub async fn reset_password(
     reset_service
         .reset_password(&req.token, &req.new_password)
         .await
-        .map_err(|e| ApiError(
-            match e.to_string().as_str() {
-                "Invalid or expired token" => StatusCode::BAD_REQUEST,
-                "Token has already been used" => StatusCode::BAD_REQUEST,
-                "Token has expired" => StatusCode::BAD_REQUEST,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            },
-            e.to_string(),
-        ))?;
+        .map_err(|e| {
+            ApiError(
+                match e.to_string().as_str() {
+                    "Invalid or expired token" => StatusCode::BAD_REQUEST,
+                    "Token has already been used" => StatusCode::BAD_REQUEST,
+                    "Token has expired" => StatusCode::BAD_REQUEST,
+                    _ => StatusCode::INTERNAL_SERVER_ERROR,
+                },
+                e.to_string(),
+            )
+        })?;
 
     Ok(Json(ResetResponse {
         success: true,

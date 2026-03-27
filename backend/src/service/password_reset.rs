@@ -1,17 +1,20 @@
 //! 密码重置服务
 
-use anyhow::{Result, bail};
-use argon2::{password_hash::{rand_core::OsRng, PasswordHasher, SaltString}, Argon2};
+use anyhow::{bail, Result};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+    Argon2,
+};
 use chrono::{Duration, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-    ActiveValue, QuerySelect,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QuerySelect, Set,
 };
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::email::{EmailConfig, EmailSender};
 use crate::entity::{password_reset_tokens, users};
-use super::email::{EmailSender, EmailConfig};
 
 /// Token 有效期（小时）
 const TOKEN_EXPIRY_HOURS: i64 = 1;
@@ -37,7 +40,7 @@ impl<E: EmailSender> PasswordResetService<E> {
     }
 
     /// 请求密码重置
-    /// 
+    ///
     /// 如果邮箱存在，发送重置邮件；如果不存在，静默返回成功（防止枚举攻击）
     pub async fn request_reset(&self, email: &str) -> Result<()> {
         // 查找用户
@@ -50,20 +53,14 @@ impl<E: EmailSender> PasswordResetService<E> {
         let user = match user {
             Some(u) => u,
             None => {
-                tracing::info!(
-                    "Password reset requested for non-existent email: {}",
-                    email
-                );
+                tracing::info!("Password reset requested for non-existent email: {}", email);
                 return Ok(());
             }
         };
 
         // 检查用户状态
         if user.status != "active" {
-            tracing::warn!(
-                "Password reset requested for inactive user: {}",
-                email
-            );
+            tracing::warn!("Password reset requested for inactive user: {}", email);
             return Ok(());
         }
 
@@ -149,7 +146,7 @@ impl<E: EmailSender> PasswordResetService<E> {
 
         // 更新密码
         let password_hash = self.hash_password(new_password)?;
-        
+
         let mut user: users::ActiveModel = user.into();
         user.password_hash = Set(password_hash);
         user.updated_at = Set(Utc::now());
@@ -160,7 +157,10 @@ impl<E: EmailSender> PasswordResetService<E> {
         reset_token.used_at = Set(Some(Utc::now()));
         reset_token.update(&self.db).await?;
 
-        tracing::info!("Password reset successful for user: {}", user.email.unwrap());
+        tracing::info!(
+            "Password reset successful for user: {}",
+            user.email.unwrap()
+        );
 
         Ok(())
     }

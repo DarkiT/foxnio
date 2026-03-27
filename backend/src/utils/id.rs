@@ -1,7 +1,7 @@
 //! ID 生成工具
 
-use uuid::Uuid;
 use rand::Rng;
+use uuid::Uuid;
 
 /// 生成 UUID v4
 pub fn uuid() -> String {
@@ -35,7 +35,7 @@ pub fn api_key(prefix: &str) -> String {
             chars.chars().nth(idx).unwrap()
         })
         .collect();
-    
+
     format!("{}{}", prefix, random_part)
 }
 

@@ -2,12 +2,12 @@
 //!
 //! 提供灵活的角色权限系统，支持动态配置和自定义角色。
 
-use anyhow::{Result, bail};
+use crate::service::user::Claims;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::service::user::Claims;
 
 /// 系统角色定义
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -104,19 +104,19 @@ pub enum Permission {
     SystemConfig,
     /// 查看审计日志
     AuditLogRead,
-    
+
     // ============ 订阅管理权限 ============
     /// 查看订阅
     SubscriptionRead,
     /// 管理订阅
     SubscriptionWrite,
-    
+
     // ============ 计费管理权限 ============
     /// 查看计费信息
     BillingRead,
     /// 管理计费
     BillingWrite,
-    
+
     // ============ 公告管理权限 ============
     /// 查看公告
     AnnouncementRead,
@@ -209,13 +209,22 @@ impl Permission {
     /// 获取所有权限
     pub fn all() -> Vec<Self> {
         vec![
-            Self::UserRead, Self::UserWrite, Self::UserDelete,
-            Self::ApiKeyRead, Self::ApiKeyWrite, Self::ApiKeyDelete,
-            Self::AccountRead, Self::AccountWrite,
-            Self::SystemConfig, Self::AuditLogRead,
-            Self::SubscriptionRead, Self::SubscriptionWrite,
-            Self::BillingRead, Self::BillingWrite,
-            Self::AnnouncementRead, Self::AnnouncementWrite,
+            Self::UserRead,
+            Self::UserWrite,
+            Self::UserDelete,
+            Self::ApiKeyRead,
+            Self::ApiKeyWrite,
+            Self::ApiKeyDelete,
+            Self::AccountRead,
+            Self::AccountWrite,
+            Self::SystemConfig,
+            Self::AuditLogRead,
+            Self::SubscriptionRead,
+            Self::SubscriptionWrite,
+            Self::BillingRead,
+            Self::BillingWrite,
+            Self::AnnouncementRead,
+            Self::AnnouncementWrite,
         ]
     }
 }
@@ -296,7 +305,7 @@ impl PermissionService {
     /// 从配置创建权限服务
     pub fn from_config(config: &PermissionConfig) -> Self {
         let service = Self::new();
-        
+
         // 合并自定义角色配置
         if !config.roles.is_empty() || !config.custom_roles.is_empty() {
             tokio::spawn({
@@ -304,10 +313,11 @@ impl PermissionService {
                 let config = config.clone();
                 async move {
                     let mut permissions = role_permissions.write().await;
-                    
+
                     // 应用配置中的角色权限
                     for role_config in config.roles.iter().chain(config.custom_roles.iter()) {
-                        let perms: HashSet<Permission> = role_config.permissions
+                        let perms: HashSet<Permission> = role_config
+                            .permissions
                             .iter()
                             .filter_map(|p| Permission::from_str(p))
                             .collect();
@@ -316,7 +326,7 @@ impl PermissionService {
                 }
             });
         }
-        
+
         service
     }
 
@@ -325,31 +335,39 @@ impl PermissionService {
         let mut permissions = HashMap::new();
 
         // Admin - 完全访问
-        permissions.insert(
-            "admin".to_string(),
-            Permission::all().into_iter().collect(),
-        );
+        permissions.insert("admin".to_string(), Permission::all().into_iter().collect());
 
         // Manager - 管理用户和 API Keys
         permissions.insert(
             "manager".to_string(),
             [
-                Permission::UserRead, Permission::UserWrite,
-                Permission::ApiKeyRead, Permission::ApiKeyWrite, Permission::ApiKeyDelete,
-                Permission::AccountRead, Permission::AccountWrite,
+                Permission::UserRead,
+                Permission::UserWrite,
+                Permission::ApiKeyRead,
+                Permission::ApiKeyWrite,
+                Permission::ApiKeyDelete,
+                Permission::AccountRead,
+                Permission::AccountWrite,
                 Permission::BillingRead,
-                Permission::AnnouncementRead, Permission::AnnouncementWrite,
-            ].into_iter().collect(),
+                Permission::AnnouncementRead,
+                Permission::AnnouncementWrite,
+            ]
+            .into_iter()
+            .collect(),
         );
 
         // User - 普通用户权限
         permissions.insert(
             "user".to_string(),
             [
-                Permission::ApiKeyRead, Permission::ApiKeyWrite,
+                Permission::ApiKeyRead,
+                Permission::ApiKeyWrite,
                 Permission::BillingRead,
-                Permission::SubscriptionRead, Permission::SubscriptionWrite,
-            ].into_iter().collect(),
+                Permission::SubscriptionRead,
+                Permission::SubscriptionWrite,
+            ]
+            .into_iter()
+            .collect(),
         );
 
         // Guest - 只读访问
@@ -359,7 +377,9 @@ impl PermissionService {
                 Permission::ApiKeyRead,
                 Permission::BillingRead,
                 Permission::AnnouncementRead,
-            ].into_iter().collect(),
+            ]
+            .into_iter()
+            .collect(),
         );
 
         // 使用 block_in_place 来初始化
@@ -391,7 +411,11 @@ impl PermissionService {
     }
 
     /// 检查用户是否拥有所有指定权限
-    pub async fn check_permissions(&self, claims: &Claims, permissions: &[Permission]) -> Result<()> {
+    pub async fn check_permissions(
+        &self,
+        claims: &Claims,
+        permissions: &[Permission],
+    ) -> Result<()> {
         for permission in permissions {
             if !self.has_permission(&claims.role, *permission).await {
                 bail!(
@@ -405,7 +429,11 @@ impl PermissionService {
     }
 
     /// 检查用户是否拥有任意一个指定权限
-    pub async fn check_any_permission(&self, claims: &Claims, permissions: &[Permission]) -> Result<()> {
+    pub async fn check_any_permission(
+        &self,
+        claims: &Claims,
+        permissions: &[Permission],
+    ) -> Result<()> {
         for permission in permissions {
             if self.has_permission(&claims.role, *permission).await {
                 return Ok(());
@@ -427,7 +455,11 @@ impl PermissionService {
             (Role::Manager, Role::User | Role::Guest) => Ok(()),
             (Role::User, Role::Guest) => Ok(()),
             (Role::User, Role::User) => Ok(()),
-            _ => bail!("Role '{}' is not authorized for required role '{}'", claims.role, required_role),
+            _ => bail!(
+                "Role '{}' is not authorized for required role '{}'",
+                claims.role,
+                required_role
+            ),
         }
     }
 
@@ -560,10 +592,22 @@ mod tests {
     async fn test_has_permission() {
         let service = PermissionService::new();
 
-        assert!(service.has_permission("admin", Permission::UserDelete).await);
-        assert!(service.has_permission("manager", Permission::UserWrite).await);
+        assert!(
+            service
+                .has_permission("admin", Permission::UserDelete)
+                .await
+        );
+        assert!(
+            service
+                .has_permission("manager", Permission::UserWrite)
+                .await
+        );
         assert!(!service.has_permission("user", Permission::UserDelete).await);
-        assert!(!service.has_permission("guest", Permission::ApiKeyWrite).await);
+        assert!(
+            !service
+                .has_permission("guest", Permission::ApiKeyWrite)
+                .await
+        );
     }
 
     #[test]
@@ -576,7 +620,10 @@ mod tests {
 
     #[test]
     fn test_permission_from_str() {
-        assert_eq!(Permission::from_str("user_read"), Some(Permission::UserRead));
+        assert_eq!(
+            Permission::from_str("user_read"),
+            Some(Permission::UserRead)
+        );
         assert_eq!(Permission::from_str("UserRead"), Some(Permission::UserRead));
         assert_eq!(Permission::from_str("unknown"), None);
     }
@@ -608,17 +655,30 @@ mod tests {
         let service = PermissionService::new();
 
         // 添加新角色
-        service.update_role_permissions("custom", vec![Permission::ApiKeyRead, Permission::BillingRead]).await;
+        service
+            .update_role_permissions(
+                "custom",
+                vec![Permission::ApiKeyRead, Permission::BillingRead],
+            )
+            .await;
 
-        assert!(service.has_permission("custom", Permission::ApiKeyRead).await);
+        assert!(
+            service
+                .has_permission("custom", Permission::ApiKeyRead)
+                .await
+        );
         assert!(!service.has_permission("custom", Permission::UserRead).await);
 
         // 添加权限
-        service.add_role_permission("custom", Permission::UserRead).await;
+        service
+            .add_role_permission("custom", Permission::UserRead)
+            .await;
         assert!(service.has_permission("custom", Permission::UserRead).await);
 
         // 移除权限
-        service.remove_role_permission("custom", Permission::UserRead).await;
+        service
+            .remove_role_permission("custom", Permission::UserRead)
+            .await;
         assert!(!service.has_permission("custom", Permission::UserRead).await);
     }
 }

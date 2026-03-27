@@ -7,12 +7,12 @@ use std::collections::HashMap;
 /// Header 大小写映射（真实 Claude CLI 抓包）
 pub fn header_wire_casing(key: &str) -> &str {
     let key_lower = key.to_lowercase();
-    
+
     match key_lower.as_str() {
         // Title case
         "accept" => "Accept",
         "user-agent" => "User-Agent",
-        
+
         // X-Stainless-* 保持 SDK 原始大小写
         "x-stainless-retry-count" => "X-Stainless-Retry-Count",
         "x-stainless-timeout" => "X-Stainless-Timeout",
@@ -23,7 +23,7 @@ pub fn header_wire_casing(key: &str) -> &str {
         "x-stainless-runtime" => "X-Stainless-Runtime",
         "x-stainless-runtime-version" => "X-Stainless-Runtime-Version",
         "x-stainless-helper-method" => "x-stainless-helper-method",
-        
+
         // Anthropic SDK 自身设置的 header，全小写
         "anthropic-dangerous-direct-browser-access" => "anthropic-dangerous-direct-browser-access",
         "anthropic-version" => "anthropic-version",
@@ -34,7 +34,7 @@ pub fn header_wire_casing(key: &str) -> &str {
         "sec-fetch-mode" => "sec-fetch-mode",
         "accept-encoding" => "accept-encoding",
         "authorization" => "authorization",
-        
+
         _ => key,
     }
 }
@@ -66,11 +66,11 @@ pub const HEADER_WIRE_ORDER: &[&str] = &[
 pub fn sort_headers_by_wire_order(headers: &HashMap<String, String>) -> Vec<(String, String)> {
     let mut result = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    
+
     // 先按 wire order 输出
     for wire_key in HEADER_WIRE_ORDER {
         let wire_lower = wire_key.to_lowercase();
-        
+
         // 查找 header（忽略大小写）
         for (k, v) in headers {
             if k.to_lowercase() == wire_lower && !seen.contains(&wire_lower) {
@@ -80,7 +80,7 @@ pub fn sort_headers_by_wire_order(headers: &HashMap<String, String>) -> Vec<(Str
             }
         }
     }
-    
+
     // 再追加不在 wire order 中的 header
     for (k, v) in headers {
         let k_lower = k.to_lowercase();
@@ -89,7 +89,7 @@ pub fn sort_headers_by_wire_order(headers: &HashMap<String, String>) -> Vec<(Str
             seen.insert(k_lower);
         }
     }
-    
+
     result
 }
 
@@ -105,14 +105,26 @@ pub fn build_claude_headers_ordered(
         ("X-Stainless-Retry-Count".to_string(), "0".to_string()),
         ("X-Stainless-Timeout".to_string(), "600".to_string()),
         ("X-Stainless-Lang".to_string(), "js".to_string()),
-        ("X-Stainless-Package-Version".to_string(), "0.70.0".to_string()),
+        (
+            "X-Stainless-Package-Version".to_string(),
+            "0.70.0".to_string(),
+        ),
         ("X-Stainless-OS".to_string(), "Linux".to_string()),
         ("X-Stainless-Arch".to_string(), "arm64".to_string()),
         ("X-Stainless-Runtime".to_string(), "node".to_string()),
-        ("X-Stainless-Runtime-Version".to_string(), "v24.13.0".to_string()),
-        ("anthropic-dangerous-direct-browser-access".to_string(), "true".to_string()),
+        (
+            "X-Stainless-Runtime-Version".to_string(),
+            "v24.13.0".to_string(),
+        ),
+        (
+            "anthropic-dangerous-direct-browser-access".to_string(),
+            "true".to_string(),
+        ),
         ("anthropic-version".to_string(), version.to_string()),
-        ("authorization".to_string(), format!("Bearer {}", auth_token)),
+        (
+            "authorization".to_string(),
+            format!("Bearer {}", auth_token),
+        ),
         ("x-app".to_string(), "cli".to_string()),
         ("User-Agent".to_string(), user_agent.to_string()),
         ("content-type".to_string(), "application/json".to_string()),
@@ -126,56 +138,59 @@ pub fn build_claude_headers_ordered(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_header_wire_casing() {
         // X-Stainless-OS（注意：不是 X-Stainless-Os）
         assert_eq!(header_wire_casing("X-Stainless-Os"), "X-Stainless-OS");
         assert_eq!(header_wire_casing("x-stainless-os"), "X-Stainless-OS");
-        
+
         // 全小写 headers
         assert_eq!(header_wire_casing("X-App"), "x-app");
         assert_eq!(header_wire_casing("x-app"), "x-app");
         assert_eq!(header_wire_casing("Anthropic-Beta"), "anthropic-beta");
-        
+
         // 其他保持不变
         assert_eq!(header_wire_casing("Custom-Header"), "Custom-Header");
     }
-    
+
     #[test]
     fn test_sort_headers_by_wire_order() {
         let mut headers = HashMap::new();
         headers.insert("anthropic-beta".to_string(), "test-beta".to_string());
         headers.insert("Accept".to_string(), "application/json".to_string());
         headers.insert("x-app".to_string(), "cli".to_string());
-        
+
         let sorted = sort_headers_by_wire_order(&headers);
-        
+
         // Accept 应该在第一位
         assert_eq!(sorted[0].0, "Accept");
-        
+
         // x-app 应该在 anthropic-beta 前面
         let x_app_pos = sorted.iter().position(|(k, _)| k == "x-app").unwrap();
-        let beta_pos = sorted.iter().position(|(k, _)| k == "anthropic-beta").unwrap();
+        let beta_pos = sorted
+            .iter()
+            .position(|(k, _)| k == "anthropic-beta")
+            .unwrap();
         assert!(x_app_pos < beta_pos);
     }
-    
+
     #[test]
     fn test_build_claude_headers_ordered() {
         let headers = build_claude_headers_ordered(
             "test-token",
             "test-beta",
             "claude-cli/2.1.22",
-            "2023-06-01"
+            "2023-06-01",
         );
-        
+
         assert_eq!(headers.len(), 19);
-        
+
         // 验证顺序
         assert_eq!(headers[0].0, "Accept");
         assert_eq!(headers[5].0, "X-Stainless-OS");
         assert_eq!(headers[12].0, "x-app");
-        
+
         // 验证值
         assert!(headers[11].1.starts_with("Bearer"));
         assert_eq!(headers[15].1, "test-beta");

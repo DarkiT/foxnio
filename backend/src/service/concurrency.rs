@@ -46,7 +46,7 @@ pub struct ConcurrencyController {
 impl ConcurrencyController {
     pub fn new(config: ConcurrencyConfig) -> Self {
         let global_semaphore = Arc::new(Semaphore::new(config.global_max_concurrent as usize));
-        
+
         Self {
             config,
             global_semaphore,
@@ -55,23 +55,21 @@ impl ConcurrencyController {
             api_key_semaphores: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// 获取用户信号量
     async fn get_user_semaphore(&self, user_id: &str) -> Arc<Semaphore> {
         let mut semaphores = self.user_semaphores.write().await;
-        
+
         semaphores
             .entry(user_id.to_string())
-            .or_insert_with(|| {
-                Arc::new(Semaphore::new(self.config.user_max_concurrent as usize))
-            })
+            .or_insert_with(|| Arc::new(Semaphore::new(self.config.user_max_concurrent as usize)))
             .clone()
     }
-    
+
     /// 获取账号信号量
     async fn get_account_semaphore(&self, account_id: &str) -> Arc<Semaphore> {
         let mut semaphores = self.account_semaphores.write().await;
-        
+
         semaphores
             .entry(account_id.to_string())
             .or_insert_with(|| {
@@ -79,11 +77,11 @@ impl ConcurrencyController {
             })
             .clone()
     }
-    
+
     /// 获取 API Key 信号量
     async fn get_api_key_semaphore(&self, api_key_id: &str) -> Arc<Semaphore> {
         let mut semaphores = self.api_key_semaphores.write().await;
-        
+
         semaphores
             .entry(api_key_id.to_string())
             .or_insert_with(|| {
@@ -91,7 +89,7 @@ impl ConcurrencyController {
             })
             .clone()
     }
-    
+
     /// 尝试获取并发槽位（非阻塞）
     pub async fn try_acquire(
         &self,
@@ -100,35 +98,36 @@ impl ConcurrencyController {
         api_key_id: &str,
     ) -> Result<Option<ConcurrencySlot>, ConcurrencyError> {
         // 1. 检查全局限制
-        let global_permit = self.global_semaphore
+        let global_permit = self
+            .global_semaphore
             .try_acquire()
             .map_err(|_| ConcurrencyError::GlobalLimitReached)?;
-        
+
         // 2. 检查用户限制
         let user_semaphore = self.get_user_semaphore(user_id).await;
         let user_permit = user_semaphore
             .try_acquire()
             .map_err(|_| ConcurrencyError::UserLimitReached)?;
-        
+
         // 3. 检查账号限制
         let account_semaphore = self.get_account_semaphore(account_id).await;
         let account_permit = account_semaphore
             .try_acquire()
             .map_err(|_| ConcurrencyError::AccountLimitReached)?;
-        
+
         // 4. 检查 API Key 限制
         let api_key_semaphore = self.get_api_key_semaphore(api_key_id).await;
         let api_key_permit = api_key_semaphore
             .try_acquire()
             .map_err(|_| ConcurrencyError::ApiKeyLimitReached)?;
-        
+
         // 所有检查通过，返回槽位
         // 注意：这里简化处理，实际需要正确管理 permit 的生命周期
         Ok(Some(ConcurrencySlot {
             _permit: api_key_permit,
         }))
     }
-    
+
     /// 获取并发槽位（阻塞等待）
     pub async fn acquire(
         &self,
@@ -137,40 +136,41 @@ impl ConcurrencyController {
         api_key_id: &str,
     ) -> Result<ConcurrencySlot, ConcurrencyError> {
         // 按顺序获取许可
-        let global_permit = self.global_semaphore
+        let global_permit = self
+            .global_semaphore
             .acquire()
             .await
             .map_err(|_| ConcurrencyError::GlobalLimitReached)?;
-        
+
         let user_semaphore = self.get_user_semaphore(user_id).await;
         let user_permit = user_semaphore
             .acquire()
             .await
             .map_err(|_| ConcurrencyError::UserLimitReached)?;
-        
+
         let account_semaphore = self.get_account_semaphore(account_id).await;
         let account_permit = account_semaphore
             .acquire()
             .await
             .map_err(|_| ConcurrencyError::AccountLimitReached)?;
-        
+
         let api_key_semaphore = self.get_api_key_semaphore(api_key_id).await;
         let api_key_permit = api_key_semaphore
             .acquire()
             .await
             .map_err(|_| ConcurrencyError::ApiKeyLimitReached)?;
-        
+
         Ok(ConcurrencySlot {
             _permit: api_key_permit,
         })
     }
-    
+
     /// 获取当前并发统计
     pub async fn get_stats(&self) -> ConcurrencyStats {
         let user_semaphores = self.user_semaphores.read().await;
         let account_semaphores = self.account_semaphores.read().await;
         let api_key_semaphores = self.api_key_semaphores.read().await;
-        
+
         ConcurrencyStats {
             global_available: self.global_semaphore.available_permits(),
             total_users: user_semaphores.len(),
@@ -178,7 +178,7 @@ impl ConcurrencyController {
             total_api_keys: api_key_semaphores.len(),
         }
     }
-    
+
     /// 清理不活跃的信号量
     pub async fn cleanup_inactive(&self) {
         // TODO: 实现 LRU 清理
@@ -219,25 +219,25 @@ pub struct ConcurrencyStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_concurrency_config_default() {
         let config = ConcurrencyConfig::default();
-        
+
         assert_eq!(config.user_max_concurrent, 5);
         assert_eq!(config.account_max_concurrent, 10);
         assert_eq!(config.api_key_max_concurrent, 5);
         assert_eq!(config.global_max_concurrent, 1000);
     }
-    
+
     #[test]
     fn test_concurrency_controller_creation() {
         let config = ConcurrencyConfig::default();
         let controller = ConcurrencyController::new(config);
-        
+
         assert_eq!(controller.global_semaphore.available_permits(), 1000);
     }
-    
+
     #[tokio::test]
     async fn test_concurrency_acquire() {
         let config = ConcurrencyConfig {
@@ -246,37 +246,37 @@ mod tests {
             api_key_max_concurrent: 2,
             global_max_concurrent: 100,
         };
-        
+
         let controller = ConcurrencyController::new(config);
-        
+
         // 第一个应该成功
         let slot1 = controller.try_acquire("user1", "account1", "key1").await;
         assert!(slot1.is_ok());
-        
+
         // 第二个应该成功
         let slot2 = controller.try_acquire("user1", "account1", "key1").await;
         assert!(slot2.is_ok());
-        
+
         // 第三个应该失败（超过限制）
         let slot3 = controller.try_acquire("user1", "account1", "key1").await;
         assert!(slot3.is_err());
     }
-    
+
     #[tokio::test]
     async fn test_concurrency_stats() {
         let controller = ConcurrencyController::new(ConcurrencyConfig::default());
-        
+
         let stats = controller.get_stats().await;
-        
+
         assert_eq!(stats.global_available, 1000);
         assert_eq!(stats.total_users, 0);
     }
-    
+
     #[test]
     fn test_concurrency_error_display() {
         let error = ConcurrencyError::UserLimitReached;
         let display = format!("{}", error);
-        
+
         assert!(display.contains("User concurrency limit"));
     }
 }

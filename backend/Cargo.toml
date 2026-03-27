@@ -25,6 +25,7 @@ rustls = "0.23"
 # Database
 sea-orm = { version = "0.12", features = ["sqlx-postgres", "runtime-tokio-native-tls", "macros"] }
 sea-orm-migration = "0.12"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "chrono", "uuid"] }
 
 # Redis
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
@@ -63,7 +64,7 @@ regex = "1.10"
 base64 = "0.22"
 hex = "0.4"
 sha2 = "0.10"
-hmac = "0.2"
+hmac = "0.12"
 
 # Email
 lettre = { version = "0.11", features = ["tokio1-native-tls"] }
@@ -72,9 +73,10 @@ lettre = { version = "0.11", features = ["tokio1-native-tls"] }
 aes-gcm = "0.10"
 zeroize = { version = "1.7", features = ["derive"] }
 urlencoding = "2.1"
+typenum = "1.17"
 
 # TOTP Two-Factor Authentication
-totp-lite = "3.1"
+totp-lite = "2.0"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 url = "2.5"
 
@@ -89,6 +91,10 @@ dotenvy = "0.15"
 
 # System (for health checks)
 nix = { version = "0.27", features = ["fs"] }
+
+# Metrics
+prometheus = "0.13"
+lazy_static = "1.4"
 
 [dev-dependencies]
 tokio-test = "0.4"

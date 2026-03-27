@@ -10,6 +10,7 @@ mod entity;
 mod gateway;
 mod handler;
 mod health;
+mod metrics;
 mod model;
 mod service;
 mod utils;
@@ -24,6 +25,9 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // 初始化指标系统
+    metrics::init_metrics();
+
     // 初始化加密服务
     if std::env::var("FOXNIO_MASTER_KEY").is_ok() {
         match utils::init_encryption_service() {
@@ -37,12 +41,11 @@ async fn main() -> Result<()> {
     }
 
     // 加载配置
-    let config = config::Config::load()
-        .unwrap_or_else(|_| {
-            tracing::warn!("Using default config");
-            config::Config::default()
-        });
-    
+    let config = config::Config::load().unwrap_or_else(|_| {
+        tracing::warn!("Using default config");
+        config::Config::default()
+    });
+
     tracing::info!("🦊 FoxNIO starting...");
     tracing::info!("Server: {}:{}", config.server.host, config.server.port);
 
@@ -60,44 +63,54 @@ async fn main() -> Result<()> {
     tracing::info!("Migrations completed");
 
     // 创建健康检查器
-    let health_checker = Arc::new(health::HealthChecker::new()
-        .with_timeout(std::time::Duration::from_secs(5))
-        .with_retries(3));
-    
+    let health_checker = Arc::new(
+        health::HealthChecker::new()
+            .with_timeout(std::time::Duration::from_secs(5))
+            .with_retries(3),
+    );
+
     // 注册健康检查
-    health_checker.register(Box::new(
-        health::PostgresHealthCheck::new(db.sqlx.clone())
-    )).await;
-    
-    health_checker.register(Box::new(
-        health::RedisHealthCheck::new(redis.clone())
-    )).await;
-    
-    health_checker.register(Box::new(
-        health::SystemResourceHealthCheck::new()
-            .with_cpu_threshold(90.0)
-            .with_memory_threshold(90.0)
-            .with_disk_threshold(90.0)
-    )).await;
-    
-    tracing::info!("Health checker initialized with {} checks", health_checker.check_names().await.len());
+    health_checker
+        .register(Box::new(health::PostgresHealthCheck::new(db.sqlx.clone())))
+        .await;
+
+    health_checker
+        .register(Box::new(health::RedisHealthCheck::new(redis.clone())))
+        .await;
+
+    health_checker
+        .register(Box::new(
+            health::SystemResourceHealthCheck::new()
+                .with_cpu_threshold(90.0)
+                .with_memory_threshold(90.0)
+                .with_disk_threshold(90.0),
+        ))
+        .await;
+
+    tracing::info!(
+        "Health checker initialized with {} checks",
+        health_checker.check_names().await.len()
+    );
 
     // 构建应用
-    let app = gateway::build_app(gateway::AppState {
-        db: db.clone(),
-        redis: redis.clone(),
-        config: config.clone(),
-    }, health_checker);
+    let app = gateway::build_app(
+        gateway::AppState {
+            db: db.clone(),
+            redis: redis.clone(),
+            config: config.clone(),
+        },
+        health_checker,
+    );
 
     // 启动服务器
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    
+
     tracing::info!("🦊 FoxNIO listening on {}", addr);
     tracing::info!("API: http://{}/v1/models", addr);
     tracing::info!("Health: http://{}/health", addr);
     tracing::info!("Admin: http://{}/api/v1/admin/users", addr);
-    
+
     axum::serve(listener, app).await?;
 
     Ok(())

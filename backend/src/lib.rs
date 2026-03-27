@@ -2,12 +2,14 @@
 //!
 //! 订阅配额分发管理平台
 
+pub mod alert;
 pub mod cache;
 pub mod config;
 pub mod db;
 pub mod gateway;
 pub mod handler;
 pub mod health;
+pub mod metrics;
 pub mod model;
 pub mod server;
 pub mod service;
@@ -15,10 +17,10 @@ pub mod utils;
 
 pub use config::Config;
 pub use gateway::Gateway;
-pub use health::{HealthChecker, HealthStatus, HealthCheck};
+pub use health::{HealthCheck, HealthChecker, HealthStatus};
 
 // Re-export HTTP/2 configuration types
 pub use config::{
-    Http2Config, Http2ClientConfig, ServerConfig, TlsConfig, TlsVersion, ClientAuthMode,
+    ClientAuthMode, Http2ClientConfig, Http2Config, ServerConfig, TlsConfig, TlsVersion,
 };
-pub use server::{TlsError, load_certs, load_private_key, build_tls_server_config};
+pub use server::{build_tls_server_config, load_certs, load_private_key, TlsError};

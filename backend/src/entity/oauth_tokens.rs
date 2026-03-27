@@ -99,9 +99,7 @@ impl Model {
     /// 检查是否需要刷新（提前 5 分钟刷新）
     pub fn needs_refresh(&self) -> bool {
         match self.expires_at {
-            Some(expires_at) => {
-                Utc::now() >= expires_at - chrono::Duration::minutes(5)
-            }
+            Some(expires_at) => Utc::now() >= expires_at - chrono::Duration::minutes(5),
             None => false,
         }
     }
@@ -131,11 +129,7 @@ pub struct CreateOAuthToken {
 }
 
 impl CreateOAuthToken {
-    pub fn new(
-        account_id: Uuid,
-        provider: String,
-        access_token: String,
-    ) -> Self {
+    pub fn new(account_id: Uuid, provider: String, access_token: String) -> Self {
         Self {
             account_id,
             provider,
@@ -175,9 +169,8 @@ impl CreateOAuthToken {
 
     /// 计算过期时间
     pub fn calculate_expires_at(&self) -> Option<DateTime<Utc>> {
-        self.expires_in.map(|seconds| {
-            Utc::now() + chrono::Duration::seconds(seconds)
-        })
+        self.expires_in
+            .map(|seconds| Utc::now() + chrono::Duration::seconds(seconds))
     }
 }
 

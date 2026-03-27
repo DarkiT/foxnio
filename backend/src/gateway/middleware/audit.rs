@@ -15,9 +15,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
 
+use crate::entity::audit_logs::AuditAction;
 use crate::gateway::SharedState;
 use crate::service::{AuditEntry, AuditService};
-use crate::entity::audit_logs::AuditAction;
 
 /// 审计中间件配置
 #[derive(Debug, Clone)]
@@ -66,20 +66,27 @@ pub async fn audit_middleware(
     let path = uri.path().to_string();
 
     // 检查是否为排除路径
-    if audit_config.excluded_paths.iter().any(|p| path.starts_with(p)) {
+    if audit_config
+        .excluded_paths
+        .iter()
+        .any(|p| path.starts_with(p))
+    {
         return next.run(req).await;
     }
 
     // 提取用户信息
     let user_id = req.extensions().get::<Uuid>().copied();
-    
+
     // 提取客户端信息
     let ip_address = extract_ip(&req);
     let user_agent = extract_user_agent(&req);
 
     // 判断是否为敏感操作
-    let is_sensitive = audit_config.sensitive_paths.iter().any(|p| path.starts_with(p));
-    
+    let is_sensitive = audit_config
+        .sensitive_paths
+        .iter()
+        .any(|p| path.starts_with(p));
+
     // 读取请求体（如果需要）
     let request_data = if audit_config.log_request_body && is_sensitive {
         let body_bytes = axum::body::to_bytes(req.body_mut(), 1024 * 1024).await.ok();
@@ -109,7 +116,7 @@ pub async fn audit_middleware(
     // 异步记录审计日志（不阻塞响应）
     if audit_config.log_all_requests || is_sensitive {
         let audit_service = AuditService::new(state.db.clone());
-        
+
         let entry = AuditEntry {
             user_id,
             action,
@@ -132,10 +139,9 @@ pub async fn audit_middleware(
     // 添加审计头
     let mut response = response;
     if let Some(request_id) = req.extensions().get::<String>() {
-        response.headers_mut().insert(
-            "x-audit-id",
-            request_id.parse().unwrap(),
-        );
+        response
+            .headers_mut()
+            .insert("x-audit-id", request_id.parse().unwrap());
     }
 
     response
@@ -178,22 +184,22 @@ fn determine_action(method: &axum::http::Method, path: &str) -> String {
     if path.ends_with("/auth/login") {
         return AuditAction::UserLogin.as_str().to_string();
     }
-    
+
     // 注册
     if path.ends_with("/auth/register") {
         return AuditAction::UserRegister.as_str().to_string();
     }
-    
+
     // 登出
     if path.ends_with("/auth/logout") {
         return AuditAction::UserLogout.as_str().to_string();
     }
-    
+
     // 密码修改
     if path.contains("password") || path.contains("change-password") {
         return AuditAction::PasswordChange.as_str().to_string();
     }
-    
+
     // API Key 管理
     if path.contains("/apikeys") {
         return match method.as_str() {
@@ -202,7 +208,7 @@ fn determine_action(method: &axum::http::Method, path: &str) -> String {
             _ => AuditAction::ApiKeyUpdate.as_str().to_string(),
         };
     }
-    
+
     // 账户管理
     if path.contains("/admin/accounts") {
         return match method.as_str() {
@@ -211,17 +217,17 @@ fn determine_action(method: &axum::http::Method, path: &str) -> String {
             _ => AuditAction::AccountUpdate.as_str().to_string(),
         };
     }
-    
+
     // 管理员操作
     if path.contains("/admin/") {
         return AuditAction::AdminAction.as_str().to_string();
     }
-    
+
     // 余额更新
     if path.contains("/balance") {
         return AuditAction::BalanceUpdate.as_str().to_string();
     }
-    
+
     // 默认为 API 请求
     AuditAction::ApiRequest.as_str().to_string()
 }
@@ -272,7 +278,7 @@ pub async fn sensitive_audit(
     // 记录敏感操作审计日志
     let audit_service = AuditService::new(state.db.clone());
     let action = determine_action(&method, &path);
-    
+
     let entry = AuditEntry {
         user_id: Some(user_id),
         action,

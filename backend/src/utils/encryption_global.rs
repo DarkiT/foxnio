@@ -32,11 +32,9 @@ pub fn init_encryption_service() -> Result<(), EncryptionError> {
     let service = EncryptionService::from_env()
         .map_err(|e| EncryptionError::EncryptionFailed(e.to_string()))?;
 
-    ENCRYPTION_SERVICE
-        .set(Arc::new(service))
-        .map_err(|_| EncryptionError::EncryptionFailed(
-            "Encryption service already initialized".to_string()
-        ))?;
+    ENCRYPTION_SERVICE.set(Arc::new(service)).map_err(|_| {
+        EncryptionError::EncryptionFailed("Encryption service already initialized".to_string())
+    })?;
 
     tracing::info!("Global encryption service initialized");
     Ok(())
@@ -48,11 +46,9 @@ pub fn init_encryption_service() -> Result<(), EncryptionError> {
 pub fn init_encryption_service_with_key(master_key: &[u8]) -> Result<(), EncryptionError> {
     let service = EncryptionService::new(master_key)?;
 
-    ENCRYPTION_SERVICE
-        .set(Arc::new(service))
-        .map_err(|_| EncryptionError::EncryptionFailed(
-            "Encryption service already initialized".to_string()
-        ))?;
+    ENCRYPTION_SERVICE.set(Arc::new(service)).map_err(|_| {
+        EncryptionError::EncryptionFailed("Encryption service already initialized".to_string())
+    })?;
 
     tracing::info!("Global encryption service initialized with custom key");
     Ok(())
@@ -69,11 +65,9 @@ pub fn init_encryption_service_with_rotation(
 ) -> Result<(), EncryptionError> {
     let service = EncryptionService::with_rotation(master_key, old_master_key)?;
 
-    ENCRYPTION_SERVICE
-        .set(Arc::new(service))
-        .map_err(|_| EncryptionError::EncryptionFailed(
-            "Encryption service already initialized".to_string()
-        ))?;
+    ENCRYPTION_SERVICE.set(Arc::new(service)).map_err(|_| {
+        EncryptionError::EncryptionFailed("Encryption service already initialized".to_string())
+    })?;
 
     tracing::info!("Global encryption service initialized with key rotation");
     Ok(())
@@ -117,24 +111,21 @@ pub struct GlobalEncryption;
 impl GlobalEncryption {
     /// 加密字符串
     pub fn encrypt(plaintext: &str) -> Result<String, EncryptionError> {
-        let enc = get_encryption_service()
-            .ok_or(EncryptionError::MasterKeyNotConfigured)?;
+        let enc = get_encryption_service().ok_or(EncryptionError::MasterKeyNotConfigured)?;
         enc.encrypt(plaintext)
             .map_err(|e| EncryptionError::EncryptionFailed(e.to_string()))
     }
 
     /// 解密字符串
     pub fn decrypt(ciphertext: &str) -> Result<String, EncryptionError> {
-        let enc = get_encryption_service()
-            .ok_or(EncryptionError::MasterKeyNotConfigured)?;
+        let enc = get_encryption_service().ok_or(EncryptionError::MasterKeyNotConfigured)?;
         enc.decrypt(ciphertext)
             .map_err(|e| EncryptionError::DecryptionFailed(e.to_string()))
     }
 
     /// 哈希敏感数据
     pub fn hash_sensitive(data: &str) -> Result<String, EncryptionError> {
-        let enc = get_encryption_service()
-            .ok_or(EncryptionError::MasterKeyNotConfigured)?;
+        let enc = get_encryption_service().ok_or(EncryptionError::MasterKeyNotConfigured)?;
         enc.hash_sensitive(data)
             .map_err(|e| EncryptionError::EncryptionFailed(e.to_string()))
     }
@@ -165,16 +156,16 @@ mod tests {
         // 由于全局状态，这个测试可能会影响其他测试
         // 在实际测试中应该使用独立的 EncryptionService 实例
         let key = create_test_key();
-        
+
         // 检查初始化状态（可能已被其他测试初始化）
         let was_initialized = is_encryption_initialized();
-        
+
         if !was_initialized {
             let result = init_encryption_service_with_key(&key);
             assert!(result.is_ok());
             assert!(is_encryption_initialized());
         }
-        
+
         let service = get_encryption_service();
         assert!(service.is_some());
     }
@@ -182,17 +173,17 @@ mod tests {
     #[test]
     fn test_global_encryption_encrypt_decrypt() {
         let key = create_test_key();
-        
+
         if !is_encryption_initialized() {
             let _ = init_encryption_service_with_key(&key);
         }
-        
+
         let enc = encryption_service();
         let plaintext = "test-secret-data";
-        
+
         let encrypted = enc.encrypt(plaintext).unwrap();
         let decrypted = enc.decrypt(&encrypted).unwrap();
-        
+
         assert_eq!(decrypted, plaintext);
     }
 }

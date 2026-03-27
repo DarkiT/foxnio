@@ -9,17 +9,16 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Json,
 };
+use once_cell::sync::Lazy;
 use serde_json::json;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 
-use crate::service::user::Claims;
 use crate::service::permission::{Permission, PermissionService, Role};
+use crate::service::user::Claims;
 
 /// 全局权限服务实例
-static PERMISSION_SERVICE: Lazy<Arc<PermissionService>> = Lazy::new(|| {
-    Arc::new(PermissionService::new())
-});
+static PERMISSION_SERVICE: Lazy<Arc<PermissionService>> =
+    Lazy::new(|| Arc::new(PermissionService::new()));
 
 /// 获取权限服务实例
 pub fn get_permission_service() -> Arc<PermissionService> {
@@ -51,7 +50,7 @@ pub fn role_denied(required: &str, actual: &str) -> Response {
 }
 
 /// 需要指定权限的中间件
-/// 
+///
 /// # Example
 /// ```rust
 /// // 在路由中使用
@@ -68,14 +67,14 @@ pub async fn require_permission_middleware(
     next: Next,
 ) -> Result<Response, Response> {
     let service = get_permission_service();
-    
+
     if !service.has_permission(&claims.role, permission).await {
         return Err(permission_denied(&format!(
             "Permission '{}' is required",
             permission
         )));
     }
-    
+
     Ok(next.run(req).await)
 }
 
@@ -101,7 +100,7 @@ pub async fn require_admin(
     if !PermissionService::is_admin_or_higher(&claims) {
         return Err(role_denied("admin", &claims.role));
     }
-    
+
     Ok(next.run(req).await)
 }
 
@@ -114,7 +113,7 @@ pub async fn require_manager(
     if !PermissionService::is_manager_or_higher(&claims) {
         return Err(role_denied("manager", &claims.role));
     }
-    
+
     Ok(next.run(req).await)
 }
 
@@ -126,13 +125,13 @@ pub async fn require_any_permission_middleware(
     next: Next,
 ) -> Result<Response, Response> {
     let service = get_permission_service();
-    
+
     for permission in &permissions {
         if service.has_permission(&claims.role, *permission).await {
             return Ok(next.run(req).await);
         }
     }
-    
+
     Err(permission_denied(&format!(
         "Any of permissions {:?} is required",
         permissions.iter().map(|p| p.as_str()).collect::<Vec<_>>()
@@ -147,7 +146,7 @@ pub async fn require_all_permissions_middleware(
     next: Next,
 ) -> Result<Response, Response> {
     let service = get_permission_service();
-    
+
     for permission in &permissions {
         if !service.has_permission(&claims.role, *permission).await {
             return Err(permission_denied(&format!(
@@ -156,18 +155,29 @@ pub async fn require_all_permissions_middleware(
             )));
         }
     }
-    
+
     Ok(next.run(req).await)
 }
 
 // ============ 便捷中间件创建器 ============
 
 /// 创建需要指定权限的中间件
-pub fn with_permission(permission: Permission) -> impl Fn(Extension<Claims>, Request<Body>, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, Response>> + Send>> + Clone + Send + Sync + 'static {
+pub fn with_permission(
+    permission: Permission,
+) -> impl Fn(
+    Extension<Claims>,
+    Request<Body>,
+    Next,
+)
+    -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, Response>> + Send>>
+       + Clone
+       + Send
+       + Sync
+       + 'static {
     move |Extension(claims): Extension<Claims>, req: Request<Body>, next: Next| {
         let permission = permission;
         let service = get_permission_service();
-        
+
         Box::pin(async move {
             if !service.has_permission(&claims.role, permission).await {
                 return Err(permission_denied(&format!(
@@ -175,17 +185,28 @@ pub fn with_permission(permission: Permission) -> impl Fn(Extension<Claims>, Req
                     permission
                 )));
             }
-            
+
             Ok(next.run(req).await)
         })
     }
 }
 
 /// 创建需要指定角色的中间件
-pub fn with_role(role: Role) -> impl Fn(Extension<Claims>, Request<Body>, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, Response>> + Send>> + Clone + Send + Sync + 'static {
+pub fn with_role(
+    role: Role,
+) -> impl Fn(
+    Extension<Claims>,
+    Request<Body>,
+    Next,
+)
+    -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, Response>> + Send>>
+       + Clone
+       + Send
+       + Sync
+       + 'static {
     move |Extension(claims): Extension<Claims>, req: Request<Body>, next: Next| {
         let role = role;
-        
+
         Box::pin(async move {
             match PermissionService::check_role(&claims, role) {
                 Ok(()) => Ok(next.run(req).await),
@@ -200,24 +221,27 @@ pub fn with_role(role: Role) -> impl Fn(Extension<Claims>, Request<Body>, Next) 
 /// 检查用户是否有指定权限（用于处理器内部检查）
 pub async fn check_permission(claims: &Claims, permission: Permission) -> Result<(), String> {
     let service = get_permission_service();
-    
+
     if !service.has_permission(&claims.role, permission).await {
         return Err(format!("Permission '{}' is required", permission));
     }
-    
+
     Ok(())
 }
 
 /// 检查用户是否有任意一个权限
-pub async fn check_any_permission(claims: &Claims, permissions: &[Permission]) -> Result<(), String> {
+pub async fn check_any_permission(
+    claims: &Claims,
+    permissions: &[Permission],
+) -> Result<(), String> {
     let service = get_permission_service();
-    
+
     for permission in permissions {
         if service.has_permission(&claims.role, *permission).await {
             return Ok(());
         }
     }
-    
+
     Err(format!(
         "Any of permissions {:?} is required",
         permissions.iter().map(|p| p.as_str()).collect::<Vec<_>>()
@@ -225,15 +249,18 @@ pub async fn check_any_permission(claims: &Claims, permissions: &[Permission]) -
 }
 
 /// 检查用户是否有所有权限
-pub async fn check_all_permissions(claims: &Claims, permissions: &[Permission]) -> Result<(), String> {
+pub async fn check_all_permissions(
+    claims: &Claims,
+    permissions: &[Permission],
+) -> Result<(), String> {
     let service = get_permission_service();
-    
+
     for permission in permissions {
         if !service.has_permission(&claims.role, *permission).await {
             return Err(format!("Permission '{}' is required", permission));
         }
     }
-    
+
     Ok(())
 }
 
@@ -257,35 +284,55 @@ mod tests {
     #[tokio::test]
     async fn test_check_permission_admin() {
         let admin_claims = create_test_claims("admin");
-        
-        assert!(check_permission(&admin_claims, Permission::UserRead).await.is_ok());
-        assert!(check_permission(&admin_claims, Permission::UserDelete).await.is_ok());
-        assert!(check_permission(&admin_claims, Permission::SystemConfig).await.is_ok());
+
+        assert!(check_permission(&admin_claims, Permission::UserRead)
+            .await
+            .is_ok());
+        assert!(check_permission(&admin_claims, Permission::UserDelete)
+            .await
+            .is_ok());
+        assert!(check_permission(&admin_claims, Permission::SystemConfig)
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
     async fn test_check_permission_user() {
         let user_claims = create_test_claims("user");
-        
-        assert!(check_permission(&user_claims, Permission::ApiKeyRead).await.is_ok());
-        assert!(check_permission(&user_claims, Permission::UserDelete).await.is_err());
+
+        assert!(check_permission(&user_claims, Permission::ApiKeyRead)
+            .await
+            .is_ok());
+        assert!(check_permission(&user_claims, Permission::UserDelete)
+            .await
+            .is_err());
     }
 
     #[tokio::test]
     async fn test_check_any_permission() {
         let manager_claims = create_test_claims("manager");
-        
-        assert!(check_any_permission(&manager_claims, &[Permission::UserRead, Permission::UserDelete]).await.is_ok());
-        
+
+        assert!(check_any_permission(
+            &manager_claims,
+            &[Permission::UserRead, Permission::UserDelete]
+        )
+        .await
+        .is_ok());
+
         let user_claims = create_test_claims("user");
-        assert!(check_any_permission(&user_claims, &[Permission::UserRead, Permission::UserDelete]).await.is_err());
+        assert!(check_any_permission(
+            &user_claims,
+            &[Permission::UserRead, Permission::UserDelete]
+        )
+        .await
+        .is_err());
     }
 
     #[tokio::test]
     async fn test_is_admin_or_higher() {
         let admin_claims = create_test_claims("admin");
         let user_claims = create_test_claims("user");
-        
+
         assert!(PermissionService::is_admin_or_higher(&admin_claims));
         assert!(!PermissionService::is_admin_or_higher(&user_claims));
     }
@@ -295,7 +342,7 @@ mod tests {
         let admin_claims = create_test_claims("admin");
         let manager_claims = create_test_claims("manager");
         let user_claims = create_test_claims("user");
-        
+
         assert!(PermissionService::is_manager_or_higher(&admin_claims));
         assert!(PermissionService::is_manager_or_higher(&manager_claims));
         assert!(!PermissionService::is_manager_or_higher(&user_claims));

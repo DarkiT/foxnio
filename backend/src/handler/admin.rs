@@ -2,22 +2,17 @@
 //!
 //! 使用角色权限系统进行访问控制
 
-use axum::{
-    Extension,
-    Json,
-    http::StatusCode,
-    extract::Path,
-};
+use axum::{extract::Path, http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::gateway::SharedState;
-use crate::service::{UserService, AccountService, BillingService};
-use crate::service::user::Claims;
-use crate::service::permission::{Permission, PermissionService};
-use crate::gateway::middleware::permission::check_permission;
 use super::ApiError;
+use crate::gateway::middleware::permission::check_permission;
+use crate::gateway::SharedState;
+use crate::service::permission::{Permission, PermissionService};
+use crate::service::user::Claims;
+use crate::service::{AccountService, BillingService, UserService};
 
 // ============ 用户管理 API ============
 
@@ -72,7 +67,8 @@ pub async fn list_users(
         state.config.jwt.expire_hours,
     );
 
-    let users = user_service.list_all(1, 100)
+    let users = user_service
+        .list_all(1, 100)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -103,15 +99,25 @@ pub async fn create_user(
 
     // 验证邮箱格式
     if !req.email.contains('@') {
-        return Err(ApiError(StatusCode::BAD_REQUEST, "Invalid email format".into()));
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Invalid email format".into(),
+        ));
     }
 
     // 验证密码长度
     if req.password.len() < 8 {
-        return Err(ApiError(StatusCode::BAD_REQUEST, "Password must be at least 8 characters".into()));
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Password must be at least 8 characters".into(),
+        ));
     }
 
-    let role = if req.role.is_empty() { "user" } else { &req.role };
+    let role = if req.role.is_empty() {
+        "user"
+    } else {
+        &req.role
+    };
 
     let user_service = UserService::new(
         state.db.clone(),
@@ -120,7 +126,8 @@ pub async fn create_user(
     );
 
     // 注册用户
-    let user = user_service.register(&req.email, &req.password)
+    let user = user_service
+        .register(&req.email, &req.password)
         .await
         .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
@@ -151,8 +158,8 @@ pub async fn get_user(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let user_id = Uuid::parse_str(&id)
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let user_id =
+        Uuid::parse_str(&id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let user_service = UserService::new(
         state.db.clone(),
@@ -160,7 +167,8 @@ pub async fn get_user(
         state.config.jwt.expire_hours,
     );
 
-    let user = user_service.get_by_id(user_id)
+    let user = user_service
+        .get_by_id(user_id)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or(ApiError(StatusCode::NOT_FOUND, "User not found".into()))?;
@@ -188,8 +196,8 @@ pub async fn update_user(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let _user_id = Uuid::parse_str(&id)
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let _user_id =
+        Uuid::parse_str(&id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     // TODO: 实现用户更新逻辑
     // 需要在 UserService 中添加 update 方法
@@ -211,12 +219,15 @@ pub async fn delete_user(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let user_id = Uuid::parse_str(&id)
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let user_id =
+        Uuid::parse_str(&id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     // 不能删除自己
     if claims.sub == id {
-        return Err(ApiError(StatusCode::BAD_REQUEST, "Cannot delete yourself".into()));
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Cannot delete yourself".into(),
+        ));
     }
 
     // TODO: 实现用户删除逻辑
@@ -240,8 +251,8 @@ pub async fn update_user_balance(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let user_id = Uuid::parse_str(&id)
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let user_id =
+        Uuid::parse_str(&id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let user_service = UserService::new(
         state.db.clone(),
@@ -249,7 +260,8 @@ pub async fn update_user_balance(
         state.config.jwt.expire_hours,
     );
 
-    let new_balance = user_service.update_balance(user_id, req.delta)
+    let new_balance = user_service
+        .update_balance(user_id, req.delta)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -274,7 +286,8 @@ pub async fn list_accounts(
 
     let account_service = AccountService::new(state.db.clone());
 
-    let accounts = account_service.list_all()
+    let accounts = account_service
+        .list_all()
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -304,29 +317,38 @@ pub async fn add_account(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let name = body.get("name")
+    let name = body
+        .get("name")
         .and_then(|v| v.as_str())
         .ok_or(ApiError(StatusCode::BAD_REQUEST, "Missing name".into()))?;
-    
-    let provider = body.get("provider")
+
+    let provider = body
+        .get("provider")
         .and_then(|v| v.as_str())
         .ok_or(ApiError(StatusCode::BAD_REQUEST, "Missing provider".into()))?;
-    
-    let credential_type = body.get("credential_type")
+
+    let credential_type = body
+        .get("credential_type")
         .and_then(|v| v.as_str())
-        .ok_or(ApiError(StatusCode::BAD_REQUEST, "Missing credential_type".into()))?;
-    
-    let credential = body.get("credential")
+        .ok_or(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Missing credential_type".into(),
+        ))?;
+
+    let credential = body
+        .get("credential")
         .and_then(|v| v.as_str())
-        .ok_or(ApiError(StatusCode::BAD_REQUEST, "Missing credential".into()))?;
-    
-    let priority = body.get("priority")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0) as i32;
+        .ok_or(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Missing credential".into(),
+        ))?;
+
+    let priority = body.get("priority").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
 
     let account_service = AccountService::new(state.db.clone());
 
-    let account = account_service.add(name, provider, credential_type, credential, priority)
+    let account = account_service
+        .add(name, provider, credential_type, credential, priority)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -349,11 +371,12 @@ pub async fn delete_account_by_id(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let account_id = Uuid::parse_str(&id)
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let account_id =
+        Uuid::parse_str(&id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let account_service = AccountService::new(state.db.clone());
-    account_service.delete(account_id)
+    account_service
+        .delete(account_id)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -371,7 +394,8 @@ pub async fn delete_account(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let account_id = body.get("id")
+    let account_id = body
+        .get("id")
         .and_then(|v| v.as_str())
         .ok_or(ApiError(StatusCode::BAD_REQUEST, "Missing id".into()))?;
 
@@ -379,7 +403,8 @@ pub async fn delete_account(
         .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let account_service = AccountService::new(state.db.clone());
-    account_service.delete(account_id)
+    account_service
+        .delete(account_id)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -417,12 +442,11 @@ pub async fn get_stats(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let billing_service = BillingService::new(
-        state.db.clone(),
-        state.config.gateway.rate_multiplier,
-    );
+    let billing_service =
+        BillingService::new(state.db.clone(), state.config.gateway.rate_multiplier);
 
-    let stats = billing_service.get_global_stats(30)
+    let stats = billing_service
+        .get_global_stats(30)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -445,12 +469,11 @@ pub async fn get_dashboard(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let billing_service = BillingService::new(
-        state.db.clone(),
-        state.config.gateway.rate_multiplier,
-    );
+    let billing_service =
+        BillingService::new(state.db.clone(), state.config.gateway.rate_multiplier);
 
-    let stats = billing_service.get_global_stats(7)
+    let stats = billing_service
+        .get_global_stats(7)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

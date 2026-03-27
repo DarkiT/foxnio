@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::entity::{users, accounts, api_keys, usages};
+    use crate::entity::{accounts, api_keys, usages, users};
     use chrono::Utc;
 
     #[test]
@@ -10,7 +10,7 @@ mod tests {
         // 活跃用户
         let active_status = "active";
         assert_eq!(active_status, "active");
-        
+
         // 禁用用户
         let banned_status = "banned";
         assert_ne!(banned_status, "active");
@@ -26,8 +26,8 @@ mod tests {
     #[test]
     fn test_api_key_masking() {
         let key = "sk-abcdefghij1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let masked = format!("{}...{}", &key[..7], &key[key.len()-4..]);
-        
+        let masked = format!("{}...{}", &key[..7], &key[key.len() - 4..]);
+
         assert_eq!(masked, "sk-abcd...STUV");
     }
 
@@ -36,7 +36,7 @@ mod tests {
         // 100 分 = 1 元
         let cost_cents = 150;
         let cost_yuan = cost_cents as f64 / 100.0;
-        
+
         assert_eq!(cost_yuan, 1.5);
     }
 }

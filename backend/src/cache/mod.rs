@@ -22,9 +22,8 @@ struct CacheEntry<V> {
 impl<V> CacheEntry<V> {
     /// 创建新的缓存条目
     fn new(value: V, ttl: Option<Duration>) -> Self {
-        let expires_at = ttl.map(|duration| {
-            Utc::now() + chrono::Duration::from_std(duration).unwrap()
-        });
+        let expires_at =
+            ttl.map(|duration| Utc::now() + chrono::Duration::from_std(duration).unwrap());
         Self { value, expires_at }
     }
 
@@ -171,7 +170,7 @@ where
     /// - `None`: 不存在或已过期
     pub fn get(&self, key: &K) -> Option<V> {
         let mut cache = self.inner.write().unwrap();
-        
+
         if let Some(entry) = cache.get(key) {
             if entry.is_expired() {
                 cache.pop(key);
@@ -364,7 +363,11 @@ mod tests {
     fn test_custom_ttl() {
         let cache: Cache<String, String> = Cache::new(10);
 
-        cache.put_with_ttl("key1".to_string(), "value1".to_string(), Duration::from_millis(50));
+        cache.put_with_ttl(
+            "key1".to_string(),
+            "value1".to_string(),
+            Duration::from_millis(50),
+        );
 
         // 立即获取应该成功
         assert_eq!(cache.get(&"key1".to_string()), Some("value1".to_string()));
@@ -414,7 +417,11 @@ mod tests {
     fn test_cleanup_expired() {
         let cache: Cache<String, String> = Cache::new(10);
 
-        cache.put_with_ttl("key1".to_string(), "value1".to_string(), Duration::from_millis(50));
+        cache.put_with_ttl(
+            "key1".to_string(),
+            "value1".to_string(),
+            Duration::from_millis(50),
+        );
         cache.put("key2".to_string(), "value2".to_string());
 
         // 等待第一个键过期

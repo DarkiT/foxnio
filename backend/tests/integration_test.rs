@@ -5,7 +5,7 @@ use foxnio::{Config, Gateway};
 #[tokio::test]
 async fn test_config_default() {
     let config = Config::default();
-    
+
     assert_eq!(config.server.port, 8080);
     assert_eq!(config.database.dbname, "foxnio");
     assert_eq!(config.gateway.api_key_prefix, "sk-");
@@ -24,7 +24,7 @@ async fn test_database_url() {
         },
         ..Default::default()
     };
-    
+
     let url = config.database_url();
     assert_eq!(url, "postgres://test:pass@localhost:5432/testdb");
 }

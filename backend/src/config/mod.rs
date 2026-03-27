@@ -64,10 +64,18 @@ pub struct CompressionConfig {
     pub level: CompressionLevelConfig,
 }
 
-fn default_compression_enabled() -> bool { true }
-fn default_gzip_enabled() -> bool { true }
-fn default_brotli_enabled() -> bool { true }
-fn default_min_size() -> usize { 1024 }
+fn default_compression_enabled() -> bool {
+    true
+}
+fn default_gzip_enabled() -> bool {
+    true
+}
+fn default_brotli_enabled() -> bool {
+    true
+}
+fn default_min_size() -> usize {
+    1024
+}
 
 impl Default for CompressionConfig {
     fn default() -> Self {
@@ -158,16 +166,36 @@ pub struct Http2Config {
     pub enable_connect_protocol: bool,
 }
 
-fn default_http2_enabled() -> bool { true }
-fn default_max_concurrent_streams() -> u32 { 200 }
-fn default_initial_stream_window_size() -> u32 { 65535 }
-fn default_initial_connection_window_size() -> u32 { 65535 }
-fn default_adaptive_window() -> bool { true }
-fn default_keep_alive_interval_secs() -> u64 { 30 }
-fn default_keep_alive_timeout_secs() -> u64 { 20 }
-fn default_max_frame_size() -> u32 { 16384 }
-fn default_max_header_list_size() -> u32 { 65536 }
-fn default_enable_connect_protocol() -> bool { false }
+fn default_http2_enabled() -> bool {
+    true
+}
+fn default_max_concurrent_streams() -> u32 {
+    200
+}
+fn default_initial_stream_window_size() -> u32 {
+    65535
+}
+fn default_initial_connection_window_size() -> u32 {
+    65535
+}
+fn default_adaptive_window() -> bool {
+    true
+}
+fn default_keep_alive_interval_secs() -> u64 {
+    30
+}
+fn default_keep_alive_timeout_secs() -> u64 {
+    20
+}
+fn default_max_frame_size() -> u32 {
+    16384
+}
+fn default_max_header_list_size() -> u32 {
+    65536
+}
+fn default_enable_connect_protocol() -> bool {
+    false
+}
 
 impl Http2Config {
     pub fn keep_alive_interval(&self) -> Duration {
@@ -286,17 +314,39 @@ pub struct Http2ClientConfig {
     pub auto_negotiate: bool,
 }
 
-fn default_client_http2_enabled() -> bool { true }
-fn default_pool_size() -> usize { 16 }
-fn default_connect_timeout_secs() -> u64 { 10 }
-fn default_request_timeout_secs() -> u64 { 300 }
-fn default_pool_keep_alive_secs() -> u64 { 90 }
-fn default_max_idle_connections() -> usize { 32 }
-fn default_tcp_keepalive_secs() -> u64 { 60 }
-fn default_tcp_nodelay() -> bool { true }
-fn default_client_initial_stream_window_size() -> u32 { 65535 }
-fn default_client_max_concurrent_streams() -> u32 { 100 }
-fn default_auto_negotiate() -> bool { true }
+fn default_client_http2_enabled() -> bool {
+    true
+}
+fn default_pool_size() -> usize {
+    16
+}
+fn default_connect_timeout_secs() -> u64 {
+    10
+}
+fn default_request_timeout_secs() -> u64 {
+    300
+}
+fn default_pool_keep_alive_secs() -> u64 {
+    90
+}
+fn default_max_idle_connections() -> usize {
+    32
+}
+fn default_tcp_keepalive_secs() -> u64 {
+    60
+}
+fn default_tcp_nodelay() -> bool {
+    true
+}
+fn default_client_initial_stream_window_size() -> u32 {
+    65535
+}
+fn default_client_max_concurrent_streams() -> u32 {
+    100
+}
+fn default_auto_negotiate() -> bool {
+    true
+}
 
 impl Http2ClientConfig {
     pub fn connect_timeout(&self) -> Duration {
@@ -415,9 +465,9 @@ pub struct GatewayConfig {
 impl Config {
     /// 从文件加载配置
     pub fn load() -> Result<Self> {
-        let config_path = std::env::var("FOXNIO_CONFIG")
-            .unwrap_or_else(|_| "config.yaml".to_string());
-        
+        let config_path =
+            std::env::var("FOXNIO_CONFIG").unwrap_or_else(|_| "config.yaml".to_string());
+
         Self::from_file(&config_path)
     }
 
@@ -443,7 +493,10 @@ impl Config {
     /// Redis 连接 URL
     pub fn redis_url(&self) -> String {
         if self.redis.password.is_empty() {
-            format!("redis://{}:{}/{}", self.redis.host, self.redis.port, self.redis.db)
+            format!(
+                "redis://{}:{}/{}",
+                self.redis.host, self.redis.port, self.redis.db
+            )
         } else {
             format!(
                 "redis://:{}@{}:{}/{}",

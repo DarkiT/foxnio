@@ -1,20 +1,19 @@
 //! 审计日志处理器 - Audit Log Handler
 
 use axum::{
-    Extension,
-    Json,
+    extract::{Path, Query},
     http::StatusCode,
-    extract::{Query, Path},
+    Extension, Json,
 };
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::gateway::SharedState;
-use crate::service::{AuditService, AuditFilter};
-use crate::service::user::Claims;
-use crate::entity::audit_logs::SanitizedAuditLog;
 use super::ApiError;
+use crate::entity::audit_logs::SanitizedAuditLog;
+use crate::gateway::SharedState;
+use crate::service::user::Claims;
+use crate::service::{AuditFilter, AuditService};
 
 /// 分页查询参数
 #[derive(Debug, Deserialize)]
@@ -58,7 +57,7 @@ pub async fn list_audit_logs(
     }
 
     let audit_service = AuditService::new(state.db.clone());
-    
+
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(50).min(100);
 
@@ -67,20 +66,30 @@ pub async fn list_audit_logs(
         user_id: None,
         action: query.action,
         resource_type: query.resource_type,
-        start_time: query.start_time.and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|d| d.with_timezone(&Utc))),
-        end_time: query.end_time.and_then(|s| DateTime::parse_from_rfc3339(&s).ok().map(|d| d.with_timezone(&Utc))),
+        start_time: query.start_time.and_then(|s| {
+            DateTime::parse_from_rfc3339(&s)
+                .ok()
+                .map(|d| d.with_timezone(&Utc))
+        }),
+        end_time: query.end_time.and_then(|s| {
+            DateTime::parse_from_rfc3339(&s)
+                .ok()
+                .map(|d| d.with_timezone(&Utc))
+        }),
         page: Some(page),
         page_size: Some(page_size),
         ..Default::default()
     };
 
     // 查询日志
-    let logs = audit_service.list(filter.clone())
+    let logs = audit_service
+        .list(filter.clone())
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // 统计总数
-    let total = audit_service.count(filter)
+    let total = audit_service
+        .count(filter)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -112,16 +121,17 @@ pub async fn list_user_audit_logs(
         return Err(ApiError(StatusCode::FORBIDDEN, "Admin only".into()));
     }
 
-    let user_id = Uuid::parse_str(&user_id)
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let user_id =
+        Uuid::parse_str(&user_id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let audit_service = AuditService::new(state.db.clone());
-    
+
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(50).min(100);
 
     // 查询用户日志
-    let logs = audit_service.get_user_logs(user_id, page, page_size)
+    let logs = audit_service
+        .get_user_logs(user_id, page, page_size)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -132,7 +142,8 @@ pub async fn list_user_audit_logs(
         page_size: Some(page_size),
         ..Default::default()
     };
-    let total = audit_service.count(filter)
+    let total = audit_service
+        .count(filter)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -164,12 +175,13 @@ pub async fn list_sensitive_audit_logs(
     }
 
     let audit_service = AuditService::new(state.db.clone());
-    
+
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(50).min(100);
 
     // 查询敏感操作日志
-    let logs = audit_service.get_sensitive_logs(page, page_size)
+    let logs = audit_service
+        .get_sensitive_logs(page, page_size)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -200,12 +212,13 @@ pub async fn list_my_audit_logs(
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let audit_service = AuditService::new(state.db.clone());
-    
+
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20).min(50);
 
     // 查询用户自己的日志
-    let logs = audit_service.get_user_logs(user_id, page, page_size)
+    let logs = audit_service
+        .get_user_logs(user_id, page, page_size)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -216,7 +229,8 @@ pub async fn list_my_audit_logs(
         page_size: Some(page_size),
         ..Default::default()
     };
-    let total = audit_service.count(filter)
+    let total = audit_service
+        .count(filter)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -249,7 +263,8 @@ pub async fn cleanup_audit_logs(
     let audit_service = AuditService::new(state.db.clone());
 
     // 清理 90 天前的日志
-    let deleted = audit_service.cleanup_old_logs(90)
+    let deleted = audit_service
+        .cleanup_old_logs(90)
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -274,28 +289,32 @@ pub async fn get_audit_stats(
     let audit_service = AuditService::new(state.db.clone());
 
     // 获取各类型操作统计
-    let total = audit_service.count(AuditFilter::default())
+    let total = audit_service
+        .count(AuditFilter::default())
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let logins = audit_service.count(AuditFilter {
-        action: Some("USER_LOGIN".to_string()),
-        ..Default::default()
-    })
+    let logins = audit_service
+        .count(AuditFilter {
+            action: Some("USER_LOGIN".to_string()),
+            ..Default::default()
+        })
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let api_requests = audit_service.count(AuditFilter {
-        action: Some("API_REQUEST".to_string()),
-        ..Default::default()
-    })
+    let api_requests = audit_service
+        .count(AuditFilter {
+            action: Some("API_REQUEST".to_string()),
+            ..Default::default()
+        })
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let admin_actions = audit_service.count(AuditFilter {
-        action: Some("ADMIN_ACTION".to_string()),
-        ..Default::default()
-    })
+    let admin_actions = audit_service
+        .count(AuditFilter {
+            action: Some("ADMIN_ACTION".to_string()),
+            ..Default::default()
+        })
         .await
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

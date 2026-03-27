@@ -3,9 +3,9 @@
 #[cfg(test)]
 mod tests {
     use crate::service::announcement::{
-        Announcement, AnnouncementType, AnnouncementUpdates, AnnouncementStats
+        Announcement, AnnouncementStats, AnnouncementType, AnnouncementUpdates,
     };
-    
+
     #[test]
     fn test_announcement_types() {
         let types = vec![
@@ -15,10 +15,10 @@ mod tests {
             AnnouncementType::Update,
             AnnouncementType::Promotion,
         ];
-        
+
         assert_eq!(types.len(), 5);
     }
-    
+
     #[test]
     fn test_announcement_creation() {
         let announcement = Announcement {
@@ -35,12 +35,15 @@ mod tests {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
-        
+
         assert_eq!(announcement.title, "系统维护通知");
-        assert_eq!(announcement.announcement_type, AnnouncementType::Maintenance);
+        assert_eq!(
+            announcement.announcement_type,
+            AnnouncementType::Maintenance
+        );
         assert!(announcement.is_active);
     }
-    
+
     #[test]
     fn test_announcement_priority_sorting() {
         let mut announcements = vec![
@@ -49,16 +52,16 @@ mod tests {
             (5, "重要通知"),
             (3, "一般通知"),
         ];
-        
+
         // 按优先级降序排序
         announcements.sort_by(|a, b| b.0.cmp(&a.0));
-        
+
         assert_eq!(announcements[0].1, "紧急通知");
         assert_eq!(announcements[1].1, "重要通知");
         assert_eq!(announcements[2].1, "一般通知");
         assert_eq!(announcements[3].1, "普通通知");
     }
-    
+
     #[test]
     fn test_announcement_updates() {
         let updates = AnnouncementUpdates {
@@ -71,33 +74,33 @@ mod tests {
             is_active: None,
             is_pinned: Some(true),
         };
-        
+
         assert!(updates.title.is_some());
         assert!(updates.is_pinned.unwrap());
     }
-    
+
     #[test]
     fn test_announcement_stats() {
         let stats = AnnouncementStats {
             total_reads: 100,
             unique_readers: 75,
         };
-        
+
         assert_eq!(stats.total_reads, 100);
         assert!(stats.unique_readers <= stats.total_reads);
     }
-    
+
     #[test]
     fn test_announcement_time_range() {
         let now = chrono::Utc::now();
         let start = now - chrono::Duration::hours(1);
         let end = now + chrono::Duration::hours(24);
-        
+
         // 当前时间应该在时间范围内
         assert!(now >= start);
         assert!(now <= end);
     }
-    
+
     #[test]
     fn test_pinned_announcement() {
         let mut announcements = vec![
@@ -105,19 +108,17 @@ mod tests {
             (true, 3, "置顶公告"),
             (false, 10, "普通公告2"),
         ];
-        
+
         // 置顶优先，然后按优先级排序
-        announcements.sort_by(|a, b| {
-            match (a.0, b.0) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => b.1.cmp(&a.1),
-            }
+        announcements.sort_by(|a, b| match (a.0, b.0) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => b.1.cmp(&a.1),
         });
-        
+
         assert_eq!(announcements[0].2, "置顶公告");
     }
-    
+
     #[test]
     fn test_announcement_type_messages() {
         let messages = vec![
@@ -127,7 +128,7 @@ mod tests {
             (AnnouncementType::Update, "更新通知"),
             (AnnouncementType::Promotion, "推广通知"),
         ];
-        
+
         for (typ, msg) in messages {
             let announcement = Announcement {
                 id: uuid::Uuid::new_v4(),
@@ -143,7 +144,7 @@ mod tests {
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
             };
-            
+
             assert_eq!(announcement.announcement_type, typ);
         }
     }

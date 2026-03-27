@@ -1,11 +1,6 @@
 //! 日志工具
 
-use tracing_subscriber::{
-    fmt,
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-    EnvFilter,
-};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// 初始化日志
 pub fn init_logging() {
@@ -55,7 +50,7 @@ pub fn log_performance(operation: &str, duration_ms: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_init_logging() {
         // 不应该 panic

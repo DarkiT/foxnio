@@ -56,7 +56,9 @@ pub fn load_private_key(path: &PathBuf) -> Result<PrivateKeyDer<'static>, TlsErr
 }
 
 /// 构建 TLS 服务器配置
-pub fn build_tls_server_config(tls_config: &TlsConfig) -> Result<Arc<RustlsServerConfig>, TlsError> {
+pub fn build_tls_server_config(
+    tls_config: &TlsConfig,
+) -> Result<Arc<RustlsServerConfig>, TlsError> {
     let cert = load_certs(&tls_config.cert_path)?;
     let key = load_private_key(&tls_config.key_path)?;
 

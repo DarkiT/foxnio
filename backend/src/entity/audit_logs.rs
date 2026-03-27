@@ -14,24 +14,24 @@ pub enum AuditAction {
     UserRegister,
     PasswordChange,
     PasswordReset,
-    
+
     // API Key 管理
     ApiKeyCreate,
     ApiKeyDelete,
     ApiKeyUpdate,
-    
+
     // 账户操作
     AccountUpdate,
     AccountCreate,
     AccountDelete,
-    
+
     // 管理员操作
     AdminAction,
-    
+
     // 余额操作
     BalanceUpdate,
     BalanceRecharge,
-    
+
     // 其他
     ApiRequest,
     RateLimitExceeded,
@@ -60,7 +60,7 @@ impl AuditAction {
             Self::SecurityAlert => "SECURITY_ALERT",
         }
     }
-    
+
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "USER_LOGIN" => Some(Self::UserLogin),
@@ -83,7 +83,7 @@ impl AuditAction {
             _ => None,
         }
     }
-    
+
     /// 判断是否为敏感操作
     pub fn is_sensitive(&self) -> bool {
         matches!(
@@ -144,12 +144,12 @@ impl Model {
     pub fn get_action(&self) -> Option<AuditAction> {
         AuditAction::from_str(&self.action)
     }
-    
+
     /// 检查是否为敏感操作
     pub fn is_sensitive(&self) -> bool {
         self.get_action().map(|a| a.is_sensitive()).unwrap_or(false)
     }
-    
+
     /// 脱敏显示
     pub fn sanitized(&self) -> SanitizedAuditLog {
         SanitizedAuditLog {
@@ -219,7 +219,10 @@ mod tests {
     #[test]
     fn test_audit_action() {
         assert_eq!(AuditAction::UserLogin.as_str(), "USER_LOGIN");
-        assert_eq!(AuditAction::from_str("USER_LOGIN"), Some(AuditAction::UserLogin));
+        assert_eq!(
+            AuditAction::from_str("USER_LOGIN"),
+            Some(AuditAction::UserLogin)
+        );
         assert!(AuditAction::UserLogin.is_sensitive());
         assert!(!AuditAction::ApiRequest.is_sensitive());
     }

@@ -13,8 +13,8 @@ use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::gateway::SharedState;
 use crate::config::Http2ClientConfig;
+use crate::gateway::SharedState;
 
 /// HTTP/2 代理客户端
 pub struct ProxyClient {
@@ -68,9 +68,7 @@ impl ProxyClient {
                 .http2_max_concurrent_streams(config.max_concurrent_streams);
         }
 
-        builder
-            .build()
-            .expect("Failed to create HTTP client")
+        builder.build().expect("Failed to create HTTP client")
     }
 
     /// 转发请求到上游
@@ -163,7 +161,9 @@ impl ProxyClient {
             "api.cohere.ai",
         ];
 
-        http2_upstreams.iter().any(|&upstream| upstream_url.contains(upstream))
+        http2_upstreams
+            .iter()
+            .any(|&upstream| upstream_url.contains(upstream))
     }
 
     /// 获取客户端配置

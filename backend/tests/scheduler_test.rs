@@ -12,8 +12,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use uuid::Uuid;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 // 模拟调度器组件（因为实际模块可能尚未编译）
 mod mock {
@@ -116,7 +116,11 @@ mod mock {
             use std::sync::atomic::Ordering;
             let total = self.total_requests.load(Ordering::SeqCst);
             let success = self.success_requests.load(Ordering::SeqCst);
-            if total == 0 { 1.0 } else { success as f64 / total as f64 }
+            if total == 0 {
+                1.0
+            } else {
+                success as f64 / total as f64
+            }
         }
 
         pub fn get_total_cost_cents(&self) -> u64 {
@@ -238,7 +242,8 @@ mod mock {
 
         pub async fn select(&self, ctx: &ScheduleContext) -> Option<ScheduleResult> {
             let accounts = self.accounts.read().await;
-            let available: Vec<_> = accounts.iter()
+            let available: Vec<_> = accounts
+                .iter()
                 .filter(|a| a.status.is_available())
                 .collect();
 
@@ -263,13 +268,17 @@ mod mock {
             }
 
             let strategy = *self.strategy.read().await;
-            
+
             let result = match strategy {
                 ScheduleStrategy::RoundRobin => self.select_round_robin(&available).await,
                 ScheduleStrategy::LeastConnection => self.select_least_connection(&available).await,
-                ScheduleStrategy::WeightedResponse => self.select_weighted_response(&available).await,
+                ScheduleStrategy::WeightedResponse => {
+                    self.select_weighted_response(&available).await
+                }
                 ScheduleStrategy::CostOptimized => self.select_cost_optimized(&available).await,
-                ScheduleStrategy::LatencyOptimized => self.select_latency_optimized(&available).await,
+                ScheduleStrategy::LatencyOptimized => {
+                    self.select_latency_optimized(&available).await
+                }
                 ScheduleStrategy::Adaptive => self.select_adaptive(&available).await,
             };
 
@@ -288,7 +297,9 @@ mod mock {
             if accounts.is_empty() {
                 return None;
             }
-            let index = self.round_robin_index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let index = self
+                .round_robin_index
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let account = accounts[index % accounts.len()];
             Some(ScheduleResult {
                 account: account.clone(),
@@ -299,7 +310,10 @@ mod mock {
             })
         }
 
-        async fn select_least_connection(&self, accounts: &[&AccountInfo]) -> Option<ScheduleResult> {
+        async fn select_least_connection(
+            &self,
+            accounts: &[&AccountInfo],
+        ) -> Option<ScheduleResult> {
             // 简化实现：返回第一个可用账号
             accounts.first().map(|account| ScheduleResult {
                 account: (*account).clone(),
@@ -310,7 +324,10 @@ mod mock {
             })
         }
 
-        async fn select_weighted_response(&self, accounts: &[&AccountInfo]) -> Option<ScheduleResult> {
+        async fn select_weighted_response(
+            &self,
+            accounts: &[&AccountInfo],
+        ) -> Option<ScheduleResult> {
             accounts.first().map(|account| ScheduleResult {
                 account: (*account).clone(),
                 strategy_used: ScheduleStrategy::WeightedResponse,
@@ -322,7 +339,8 @@ mod mock {
 
         async fn select_cost_optimized(&self, accounts: &[&AccountInfo]) -> Option<ScheduleResult> {
             // 选择优先级最高的账号（简化）
-            accounts.iter()
+            accounts
+                .iter()
                 .max_by_key(|a| a.priority)
                 .map(|account| ScheduleResult {
                     account: (*account).clone(),
@@ -333,7 +351,10 @@ mod mock {
                 })
         }
 
-        async fn select_latency_optimized(&self, accounts: &[&AccountInfo]) -> Option<ScheduleResult> {
+        async fn select_latency_optimized(
+            &self,
+            accounts: &[&AccountInfo],
+        ) -> Option<ScheduleResult> {
             accounts.first().map(|account| ScheduleResult {
                 account: (*account).clone(),
                 strategy_used: ScheduleStrategy::LatencyOptimized,
@@ -345,7 +366,8 @@ mod mock {
 
         async fn select_adaptive(&self, accounts: &[&AccountInfo]) -> Option<ScheduleResult> {
             // 综合评分
-            accounts.iter()
+            accounts
+                .iter()
                 .max_by(|a, b| {
                     let score_a = a.priority as f64 + a.weight;
                     let score_b = b.priority as f64 + b.weight;
@@ -364,7 +386,7 @@ mod mock {
             let accounts = self.accounts.read().await;
             let active = accounts.iter().filter(|a| a.status.is_available()).count();
             let sessions = self.sticky_sessions.read().await;
-            
+
             SchedulerStats {
                 total_accounts: accounts.len(),
                 active_accounts: active,
@@ -417,11 +439,13 @@ async fn test_round_robin_strategy() {
 
     let ids: Vec<Uuid> = (0..3).map(|_| Uuid::new_v4()).collect();
     for (i, id) in ids.iter().enumerate() {
-        scheduler.add_account(create_test_account(*id, &format!("acc-{}", i), i as i32)).await;
+        scheduler
+            .add_account(create_test_account(*id, &format!("acc-{}", i), i as i32))
+            .await;
     }
 
     let ctx = ScheduleContext::default();
-    
+
     // 连续选择应该轮询
     let result1 = scheduler.select(&ctx).await.unwrap();
     let result2 = scheduler.select(&ctx).await.unwrap();
@@ -441,14 +465,21 @@ async fn test_least_connection_strategy() {
     config.default_strategy = ScheduleStrategy::LeastConnection;
     let scheduler = Scheduler::new(config);
 
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-1", 1)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-2", 2)).await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-1", 1))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-2", 2))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
 
     assert!(result.is_some());
-    assert_eq!(result.unwrap().strategy_used, ScheduleStrategy::LeastConnection);
+    assert_eq!(
+        result.unwrap().strategy_used,
+        ScheduleStrategy::LeastConnection
+    );
 }
 
 #[tokio::test]
@@ -457,14 +488,21 @@ async fn test_weighted_response_strategy() {
     config.default_strategy = ScheduleStrategy::WeightedResponse;
     let scheduler = Scheduler::new(config);
 
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-1", 1)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-2", 2)).await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-1", 1))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-2", 2))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
 
     assert!(result.is_some());
-    assert_eq!(result.unwrap().strategy_used, ScheduleStrategy::WeightedResponse);
+    assert_eq!(
+        result.unwrap().strategy_used,
+        ScheduleStrategy::WeightedResponse
+    );
 }
 
 #[tokio::test]
@@ -475,9 +513,13 @@ async fn test_cost_optimized_strategy() {
 
     let id_low = Uuid::new_v4();
     let id_high = Uuid::new_v4();
-    
-    scheduler.add_account(create_test_account(id_low, "low-cost", 10)).await;
-    scheduler.add_account(create_test_account(id_high, "high-cost", 1)).await;
+
+    scheduler
+        .add_account(create_test_account(id_low, "low-cost", 10))
+        .await;
+    scheduler
+        .add_account(create_test_account(id_high, "high-cost", 1))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
@@ -493,14 +535,21 @@ async fn test_latency_optimized_strategy() {
     config.default_strategy = ScheduleStrategy::LatencyOptimized;
     let scheduler = Scheduler::new(config);
 
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "fast", 1)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "slow", 1)).await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "fast", 1))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "slow", 1))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
 
     assert!(result.is_some());
-    assert_eq!(result.unwrap().strategy_used, ScheduleStrategy::LatencyOptimized);
+    assert_eq!(
+        result.unwrap().strategy_used,
+        ScheduleStrategy::LatencyOptimized
+    );
 }
 
 #[tokio::test]
@@ -511,13 +560,13 @@ async fn test_adaptive_strategy() {
 
     let id1 = Uuid::new_v4();
     let id2 = Uuid::new_v4();
-    
+
     // 创建不同权重的账号
     let mut acc1 = create_test_account(id1, "acc-1", 5);
     acc1.weight = 2.0;
     let mut acc2 = create_test_account(id2, "acc-2", 3);
     acc2.weight = 1.0;
-    
+
     scheduler.add_account(acc1).await;
     scheduler.add_account(acc2).await;
 
@@ -554,10 +603,16 @@ async fn test_all_strategies_available() {
 #[tokio::test]
 async fn test_load_balancing_distribution() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
-    
+
     // 添加 5 个账号
     for i in 0..5 {
-        scheduler.add_account(create_test_account(Uuid::new_v4(), &format!("acc-{}", i), i)).await;
+        scheduler
+            .add_account(create_test_account(
+                Uuid::new_v4(),
+                &format!("acc-{}", i),
+                i,
+            ))
+            .await;
     }
 
     let ctx = ScheduleContext::default();
@@ -572,7 +627,11 @@ async fn test_load_balancing_distribution() {
 
     // 每个账号应该被选中大约 20 次
     for (_, count) in selection_counts.iter() {
-        assert!(*count >= 15 && *count <= 25, "负载分布不均匀: {:?}", selection_counts);
+        assert!(
+            *count >= 15 && *count <= 25,
+            "负载分布不均匀: {:?}",
+            selection_counts
+        );
     }
 }
 
@@ -585,21 +644,21 @@ async fn test_weighted_distribution() {
     // 创建不同权重的账号
     let id1 = Uuid::new_v4();
     let id2 = Uuid::new_v4();
-    
+
     let mut acc1 = create_test_account(id1, "high-priority", 10);
     acc1.weight = 3.0;
     let mut acc2 = create_test_account(id2, "low-priority", 1);
     acc2.weight = 1.0;
-    
+
     scheduler.add_account(acc1).await;
     scheduler.add_account(acc2).await;
 
     let ctx = ScheduleContext::default();
-    
+
     // 多次选择，高权重账号应该被选中更多次
     let mut high_count = 0;
     let mut low_count = 0;
-    
+
     for _ in 0..100 {
         if let Some(result) = scheduler.select(&ctx).await {
             if result.account.id == id1 {
@@ -623,16 +682,20 @@ async fn test_failover_inactive_account() {
     let active_id = Uuid::new_v4();
     let inactive_id = Uuid::new_v4();
 
-    scheduler.add_account(create_test_account_with_status(
-        active_id, 
-        "active", 
-        AccountStatus::Active
-    )).await;
-    scheduler.add_account(create_test_account_with_status(
-        inactive_id, 
-        "inactive", 
-        AccountStatus::Inactive
-    )).await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            active_id,
+            "active",
+            AccountStatus::Active,
+        ))
+        .await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            inactive_id,
+            "inactive",
+            AccountStatus::Inactive,
+        ))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
@@ -649,19 +712,23 @@ async fn test_failover_degraded_account() {
     let active_id = Uuid::new_v4();
     let degraded_id = Uuid::new_v4();
 
-    scheduler.add_account(create_test_account_with_status(
-        active_id, 
-        "active", 
-        AccountStatus::Active
-    )).await;
-    scheduler.add_account(create_test_account_with_status(
-        degraded_id, 
-        "degraded", 
-        AccountStatus::Degraded
-    )).await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            active_id,
+            "active",
+            AccountStatus::Active,
+        ))
+        .await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            degraded_id,
+            "degraded",
+            AccountStatus::Degraded,
+        ))
+        .await;
 
     let ctx = ScheduleContext::default();
-    
+
     // 两个账号都应该可用（Active 和 Degraded）
     let result1 = scheduler.select(&ctx).await;
     let result2 = scheduler.select(&ctx).await;
@@ -677,16 +744,20 @@ async fn test_failover_maintenance_account() {
     let active_id = Uuid::new_v4();
     let maintenance_id = Uuid::new_v4();
 
-    scheduler.add_account(create_test_account_with_status(
-        active_id, 
-        "active", 
-        AccountStatus::Active
-    )).await;
-    scheduler.add_account(create_test_account_with_status(
-        maintenance_id, 
-        "maintenance", 
-        AccountStatus::Maintenance
-    )).await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            active_id,
+            "active",
+            AccountStatus::Active,
+        ))
+        .await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            maintenance_id,
+            "maintenance",
+            AccountStatus::Maintenance,
+        ))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
@@ -700,11 +771,13 @@ async fn test_failover_maintenance_account() {
 async fn test_no_available_accounts() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
 
-    scheduler.add_account(create_test_account_with_status(
-        Uuid::new_v4(), 
-        "inactive", 
-        AccountStatus::Inactive
-    )).await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            Uuid::new_v4(),
+            "inactive",
+            AccountStatus::Inactive,
+        ))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
@@ -717,17 +790,19 @@ async fn test_cooldown_mechanism() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
     let account_id = Uuid::new_v4();
 
-    scheduler.add_account(create_test_account(account_id, "test", 1)).await;
-    
+    scheduler
+        .add_account(create_test_account(account_id, "test", 1))
+        .await;
+
     // 设置冷却
     scheduler.set_cooldown(account_id).await;
-    
+
     // 清除冷却
     scheduler.clear_cooldown(account_id).await;
-    
+
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
-    
+
     // 冷却清除后应该可以选择
     assert!(result.is_some());
 }
@@ -737,10 +812,16 @@ async fn test_cooldown_mechanism() {
 #[tokio::test]
 async fn test_sticky_session() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
-    
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-1", 1)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-2", 2)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-3", 3)).await;
+
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-1", 1))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-2", 2))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-3", 3))
+        .await;
 
     let ctx = ScheduleContext {
         session_id: Some("session-123".to_string()),
@@ -762,9 +843,13 @@ async fn test_sticky_session() {
 #[tokio::test]
 async fn test_different_sessions_different_accounts() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
-    
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-1", 1)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-2", 2)).await;
+
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-1", 1))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-2", 2))
+        .await;
 
     let ctx1 = ScheduleContext {
         session_id: Some("session-1".to_string()),
@@ -785,9 +870,13 @@ async fn test_different_sessions_different_accounts() {
 #[tokio::test]
 async fn test_no_sticky_session() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
-    
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-1", 1)).await;
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc-2", 2)).await;
+
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-1", 1))
+        .await;
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc-2", 2))
+        .await;
 
     let ctx = ScheduleContext::default(); // 无 session_id
 
@@ -805,8 +894,10 @@ async fn test_add_account() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
     let account_id = Uuid::new_v4();
 
-    scheduler.add_account(create_test_account(account_id, "test", 1)).await;
-    
+    scheduler
+        .add_account(create_test_account(account_id, "test", 1))
+        .await;
+
     let accounts = scheduler.get_accounts().await;
     assert_eq!(accounts.len(), 1);
     assert_eq!(accounts[0].id, account_id);
@@ -817,7 +908,9 @@ async fn test_remove_account() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
     let account_id = Uuid::new_v4();
 
-    scheduler.add_account(create_test_account(account_id, "test", 1)).await;
+    scheduler
+        .add_account(create_test_account(account_id, "test", 1))
+        .await;
     assert_eq!(scheduler.get_accounts().await.len(), 1);
 
     scheduler.remove_account(account_id).await;
@@ -829,7 +922,13 @@ async fn test_multiple_accounts() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
 
     for i in 0..10 {
-        scheduler.add_account(create_test_account(Uuid::new_v4(), &format!("acc-{}", i), i)).await;
+        scheduler
+            .add_account(create_test_account(
+                Uuid::new_v4(),
+                &format!("acc-{}", i),
+                i,
+            ))
+            .await;
     }
 
     let accounts = scheduler.get_accounts().await;
@@ -842,12 +941,20 @@ async fn test_multiple_accounts() {
 async fn test_scheduler_stats() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
 
-    scheduler.add_account(create_test_account_with_status(
-        Uuid::new_v4(), "active", AccountStatus::Active
-    )).await;
-    scheduler.add_account(create_test_account_with_status(
-        Uuid::new_v4(), "inactive", AccountStatus::Inactive
-    )).await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            Uuid::new_v4(),
+            "active",
+            AccountStatus::Active,
+        ))
+        .await;
+    scheduler
+        .add_account(create_test_account_with_status(
+            Uuid::new_v4(),
+            "inactive",
+            AccountStatus::Inactive,
+        ))
+        .await;
 
     let stats = scheduler.get_stats().await;
 
@@ -860,8 +967,10 @@ async fn test_scheduler_stats() {
 #[tokio::test]
 async fn test_sticky_session_count() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
-    
-    scheduler.add_account(create_test_account(Uuid::new_v4(), "acc", 1)).await;
+
+    scheduler
+        .add_account(create_test_account(Uuid::new_v4(), "acc", 1))
+        .await;
 
     let ctx1 = ScheduleContext {
         session_id: Some("session-1".to_string()),
@@ -932,7 +1041,13 @@ async fn test_selection_performance() {
 
     // 添加 100 个账号
     for i in 0..100 {
-        scheduler.add_account(create_test_account(Uuid::new_v4(), &format!("acc-{}", i), i % 10)).await;
+        scheduler
+            .add_account(create_test_account(
+                Uuid::new_v4(),
+                &format!("acc-{}", i),
+                i % 10,
+            ))
+            .await;
     }
 
     let ctx = ScheduleContext::default();
@@ -948,7 +1063,11 @@ async fn test_selection_performance() {
     println!("每次选择耗时: {:.2} μs", per_selection);
 
     // 每次选择应该在 100μs 内完成
-    assert!(per_selection < 100.0, "选择性能不达标: {:.2} μs", per_selection);
+    assert!(
+        per_selection < 100.0,
+        "选择性能不达标: {:.2} μs",
+        per_selection
+    );
 }
 
 #[tokio::test]
@@ -957,7 +1076,13 @@ async fn test_concurrent_selection() {
 
     // 添加账号
     for i in 0..10 {
-        scheduler.add_account(create_test_account(Uuid::new_v4(), &format!("acc-{}", i), i)).await;
+        scheduler
+            .add_account(create_test_account(
+                Uuid::new_v4(),
+                &format!("acc-{}", i),
+                i,
+            ))
+            .await;
     }
 
     // 并发选择
@@ -971,8 +1096,11 @@ async fn test_concurrent_selection() {
     }
 
     let results: Vec<_> = futures::future::join_all(handles).await;
-    
-    let success_count = results.iter().filter(|r| r.as_ref().unwrap().is_some()).count();
+
+    let success_count = results
+        .iter()
+        .filter(|r| r.as_ref().unwrap().is_some())
+        .count();
     assert_eq!(success_count, 100);
 }
 
@@ -991,8 +1119,10 @@ async fn test_empty_account_list() {
 async fn test_single_account() {
     let scheduler = Scheduler::new(SchedulerConfig::default());
     let account_id = Uuid::new_v4();
-    
-    scheduler.add_account(create_test_account(account_id, "only-one", 1)).await;
+
+    scheduler
+        .add_account(create_test_account(account_id, "only-one", 1))
+        .await;
 
     let ctx = ScheduleContext::default();
     let result = scheduler.select(&ctx).await;
@@ -1007,8 +1137,13 @@ async fn test_strategy_switch() {
 
     assert_eq!(scheduler.get_strategy().await, ScheduleStrategy::RoundRobin);
 
-    scheduler.set_strategy(ScheduleStrategy::LeastConnection).await;
-    assert_eq!(scheduler.get_strategy().await, ScheduleStrategy::LeastConnection);
+    scheduler
+        .set_strategy(ScheduleStrategy::LeastConnection)
+        .await;
+    assert_eq!(
+        scheduler.get_strategy().await,
+        ScheduleStrategy::LeastConnection
+    );
 
     scheduler.set_strategy(ScheduleStrategy::Adaptive).await;
     assert_eq!(scheduler.get_strategy().await, ScheduleStrategy::Adaptive);
@@ -1036,11 +1171,19 @@ async fn test_full_workflow() {
 
     // 1. 添加账号
     for i in 0..5 {
-        scheduler.add_account(create_test_account(Uuid::new_v4(), &format!("acc-{}", i), i)).await;
+        scheduler
+            .add_account(create_test_account(
+                Uuid::new_v4(),
+                &format!("acc-{}", i),
+                i,
+            ))
+            .await;
     }
 
     // 2. 切换策略
-    scheduler.set_strategy(ScheduleStrategy::LeastConnection).await;
+    scheduler
+        .set_strategy(ScheduleStrategy::LeastConnection)
+        .await;
 
     // 3. 创建请求
     let ctx = ScheduleContext {
@@ -1068,7 +1211,13 @@ async fn test_high_load_scenario() {
 
     // 添加多个账号
     for i in 0..20 {
-        scheduler.add_account(create_test_account(Uuid::new_v4(), &format!("acc-{}", i), i % 10)).await;
+        scheduler
+            .add_account(create_test_account(
+                Uuid::new_v4(),
+                &format!("acc-{}", i),
+                i % 10,
+            ))
+            .await;
     }
 
     // 模拟高并发
@@ -1085,8 +1234,11 @@ async fn test_high_load_scenario() {
     }
 
     let results: Vec<_> = futures::future::join_all(handles).await;
-    let success_count = results.iter().filter(|r| r.as_ref().unwrap().is_some()).count();
-    
+    let success_count = results
+        .iter()
+        .filter(|r| r.as_ref().unwrap().is_some())
+        .count();
+
     assert_eq!(success_count, 1000);
 }
 
@@ -1101,9 +1253,13 @@ async fn test_cost_sensitive_selection() {
 
     let cheap_id = Uuid::new_v4();
     let expensive_id = Uuid::new_v4();
-    
-    scheduler.add_account(create_test_account(cheap_id, "cheap", 10)).await;
-    scheduler.add_account(create_test_account(expensive_id, "expensive", 1)).await;
+
+    scheduler
+        .add_account(create_test_account(cheap_id, "cheap", 10))
+        .await;
+    scheduler
+        .add_account(create_test_account(expensive_id, "expensive", 1))
+        .await;
 
     let ctx = ScheduleContext {
         cost_sensitive: true,
@@ -1136,7 +1292,7 @@ fn test_metrics_cost_tracking() {
 #[tokio::test]
 async fn test_coverage_summary() {
     // 此测试用于验证测试覆盖的所有功能
-    
+
     // 策略测试
     let strategies = [
         ScheduleStrategy::RoundRobin,

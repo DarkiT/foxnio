@@ -11,7 +11,7 @@ use uuid::Uuid;
 /// 备份类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BackupType {
-    Full,       // 全量备份
+    Full,        // 全量备份
     Incremental, // 增量备份
 }
 
@@ -75,17 +75,21 @@ impl BackupService {
     pub fn new(db: DatabaseConnection, config: BackupConfig) -> Self {
         Self { db, config }
     }
-    
+
     /// 创建备份
-    pub async fn create_backup(&self, backup_type: BackupType, created_by: Uuid) -> Result<BackupRecord> {
+    pub async fn create_backup(
+        &self,
+        backup_type: BackupType,
+        created_by: Uuid,
+    ) -> Result<BackupRecord> {
         let id = Uuid::new_v4();
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
         let filename = format!("backup_{}_{}.sql", timestamp, id);
         let file_path = self.config.backup_dir.join(&filename);
-        
+
         // 确保备份目录存在
         fs::create_dir_all(&self.config.backup_dir).await?;
-        
+
         let mut record = BackupRecord {
             id,
             backup_type: backup_type.clone(),
@@ -97,48 +101,48 @@ impl BackupService {
             error_message: None,
             created_by,
         };
-        
+
         // TODO: 实际执行备份
         // 1. 使用 pg_dump 或 mysqldump 导出数据库
         // 2. 压缩备份文件（如果配置了 compress）
         // 3. 更新记录状态
-        
+
         record.status = BackupStatus::Completed;
         record.completed_at = Some(Utc::now());
-        
+
         Ok(record)
     }
-    
+
     /// 恢复备份
     pub async fn restore_backup(&self, backup_id: Uuid) -> Result<()> {
         // TODO: 实现恢复逻辑
         // 1. 查找备份记录
         // 2. 解压备份文件
         // 3. 恢复数据库
-        
+
         Ok(())
     }
-    
+
     /// 列出所有备份
     pub async fn list_backups(&self) -> Result<Vec<BackupRecord>> {
         // TODO: 从数据库查询
         Ok(vec![])
     }
-    
+
     /// 删除备份
     pub async fn delete_backup(&self, backup_id: Uuid) -> Result<()> {
         // TODO: 删除备份文件和记录
         Ok(())
     }
-    
+
     /// 清理过期备份
     pub async fn cleanup_old_backups(&self) -> Result<Vec<Uuid>> {
         let cutoff = Utc::now() - chrono::Duration::days(self.config.retention_days as i64);
-        
+
         // TODO: 查找并删除过期备份
         Ok(vec![])
     }
-    
+
     /// 获取备份统计
     pub async fn get_stats(&self) -> Result<BackupStats> {
         Ok(BackupStats {
@@ -148,7 +152,7 @@ impl BackupService {
             newest_backup: None,
         })
     }
-    
+
     /// 验证备份完整性
     pub async fn verify_backup(&self, _backup_id: Uuid) -> Result<bool> {
         // TODO: 验证备份文件完整性
@@ -168,13 +172,13 @@ pub struct BackupStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_backup_type() {
         assert_eq!(BackupType::Full.to_string(), "Full");
         assert_eq!(BackupType::Incremental.to_string(), "Incremental");
     }
-    
+
     #[test]
     fn test_backup_status() {
         let statuses = vec![
@@ -183,20 +187,20 @@ mod tests {
             BackupStatus::Completed,
             BackupStatus::Failed,
         ];
-        
+
         assert_eq!(statuses.len(), 4);
     }
-    
+
     #[test]
     fn test_backup_config_default() {
         let config = BackupConfig::default();
-        
+
         assert_eq!(config.max_backups, 10);
         assert_eq!(config.retention_days, 30);
         assert!(config.compress);
         assert!(!config.include_tables.is_empty());
     }
-    
+
     #[test]
     fn test_backup_record_creation() {
         let record = BackupRecord {
@@ -210,32 +214,32 @@ mod tests {
             error_message: None,
             created_by: Uuid::new_v4(),
         };
-        
+
         assert_eq!(record.backup_type, BackupType::Full);
         assert_eq!(record.status, BackupStatus::Completed);
         assert!(record.completed_at.is_some());
     }
-    
+
     #[test]
     fn test_backup_filename() {
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
         let id = Uuid::new_v4();
         let filename = format!("backup_{}_{}.sql", timestamp, id);
-        
+
         assert!(filename.starts_with("backup_"));
         assert!(filename.ends_with(".sql"));
     }
-    
+
     #[test]
     fn test_retention_calculation() {
         let config = BackupConfig {
             retention_days: 30,
             ..Default::default()
         };
-        
+
         let cutoff = Utc::now() - chrono::Duration::days(config.retention_days as i64);
         let old_backup_time = Utc::now() - chrono::Duration::days(31);
-        
+
         assert!(old_backup_time < cutoff);
     }
 }

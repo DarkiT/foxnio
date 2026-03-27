@@ -27,11 +27,7 @@ pub async fn api_key_auth(
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
-        .or_else(|| {
-            req.headers()
-                .get("x-api-key")
-                .and_then(|v| v.to_str().ok())
-        });
+        .or_else(|| req.headers().get("x-api-key").and_then(|v| v.to_str().ok()));
 
     let api_key = match api_key {
         Some(k) => k,
@@ -45,8 +41,10 @@ pub async fn api_key_auth(
         state.db.clone(),
         state.config.gateway.api_key_prefix.clone(),
     );
-    
-    let key = api_key_service.validate(api_key).await
+
+    let key = api_key_service
+        .validate(api_key)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
@@ -121,13 +119,7 @@ pub async fn request_log(req: Request<Body>, next: Next) -> Response {
     let elapsed = start.elapsed();
     let status = response.status();
 
-    tracing::info!(
-        "{} {} - {} - {:?}",
-        method,
-        uri,
-        status.as_u16(),
-        elapsed
-    );
+    tracing::info!("{} {} - {} - {:?}", method, uri, status.as_u16(), elapsed);
 
     response
 }
@@ -148,7 +140,7 @@ pub async fn rate_limit(
     // 1. 从 Redis 获取当前速率
     // 2. 检查是否超限
     // 3. 更新速率计数器
-    
+
     Ok(next.run(req).await)
 }
 
@@ -162,7 +154,7 @@ pub async fn concurrency_limit(
     // TODO: 实现并发限制
     // 1. 检查用户当前并发数
     // 2. 如果超限，返回 429
-    
+
     Ok(next.run(req).await)
 }
 
@@ -174,45 +166,41 @@ pub async fn request_id(mut req: Request<Body>, next: Next) -> Response {
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .unwrap_or_else(|| crate::utils::request_id());
-    
+
     req.extensions_mut().insert(request_id.clone());
-    
+
     let mut response = next.run(req).await;
-    
-    response.headers_mut().insert(
-        "x-request-id",
-        request_id.parse().unwrap(),
-    );
-    
+
+    response
+        .headers_mut()
+        .insert("x-request-id", request_id.parse().unwrap());
+
     response
 }
 
 /// 错误处理中间件
 pub async fn error_handler(req: Request<Body>, next: Next) -> Response {
     let response = next.run(req).await;
-    
+
     // 如果是错误响应，添加更多上下文
     if !response.status().is_success() {
         let status = response.status();
-        
+
         // 记录错误
-        tracing::warn!(
-            "Request failed with status: {}",
-            status.as_u16()
-        );
+        tracing::warn!("Request failed with status: {}", status.as_u16());
     }
-    
+
     response
 }
 
 #[cfg(test)]
 mod middleware_tests {
     use super::*;
-    
+
     #[test]
     fn test_request_id_format() {
         let id = crate::utils::request_id();
-        
+
         assert!(id.starts_with("req_"));
         assert_eq!(id.len(), 12);
     }

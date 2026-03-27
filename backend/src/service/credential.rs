@@ -4,9 +4,7 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -34,15 +32,13 @@ impl CredentialService {
 
     /// 加密敏感数据
     fn encrypt(data: &str) -> Result<String> {
-        let enc = get_encryption_service()
-            .context("Encryption service not initialized")?;
+        let enc = get_encryption_service().context("Encryption service not initialized")?;
         enc.encrypt(data).context("Failed to encrypt data")
     }
 
     /// 解密敏感数据
     fn decrypt(data: &str) -> Result<String> {
-        let enc = get_encryption_service()
-            .context("Encryption service not initialized")?;
+        let enc = get_encryption_service().context("Encryption service not initialized")?;
         enc.decrypt(data).context("Failed to decrypt data")
     }
 
@@ -51,11 +47,7 @@ impl CredentialService {
     /// # Arguments
     /// * `account_id` - Account ID
     /// * `credential` - 明文凭证（如 API Key）
-    pub async fn set_account_credential(
-        &self,
-        account_id: Uuid,
-        credential: &str,
-    ) -> Result<()> {
+    pub async fn set_account_credential(&self, account_id: Uuid, credential: &str) -> Result<()> {
         let encrypted = Self::encrypt(credential)?;
 
         let account = accounts::Entity::find_by_id(account_id)
@@ -125,7 +117,10 @@ impl CredentialService {
     ///
     /// # Arguments
     /// * `create` - 创建请求
-    pub async fn create_oauth_token(&self, create: CreateOAuthToken) -> Result<oauth_tokens::Model> {
+    pub async fn create_oauth_token(
+        &self,
+        create: CreateOAuthToken,
+    ) -> Result<oauth_tokens::Model> {
         // 加密 access_token
         let encrypted_access_token = Self::encrypt(&create.access_token)?;
 

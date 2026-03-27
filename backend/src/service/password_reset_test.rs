@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::service::password_reset::*;
     use crate::service::email::MockEmailSender;
+    use crate::service::password_reset::*;
 
     #[test]
     fn test_token_length() {
@@ -20,17 +20,17 @@ mod tests {
     #[test]
     fn test_hash_token_consistency() {
         // 相同的 token 应该产生相同的哈希
-        use sha2::{Sha256, Digest};
-        
+        use sha2::{Digest, Sha256};
+
         let token = "test_token_123";
         let mut hasher1 = Sha256::new();
         hasher1.update(token.as_bytes());
         let hash1 = format!("{:x}", hasher1.finalize());
-        
+
         let mut hasher2 = Sha256::new();
         hasher2.update(token.as_bytes());
         let hash2 = format!("{:x}", hasher2.finalize());
-        
+
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 64); // SHA256 输出 64 个十六进制字符
     }
@@ -46,30 +46,38 @@ mod tests {
         ];
 
         let invalid_passwords = vec![
-            "1234567",  // 太短
-            "",         // 空密码
+            "1234567", // 太短
+            "",        // 空密码
         ];
 
         for password in valid_passwords {
-            assert!(password.len() >= 8, "Password '{}' should be valid", password);
+            assert!(
+                password.len() >= 8,
+                "Password '{}' should be valid",
+                password
+            );
         }
 
         for password in invalid_passwords {
-            assert!(password.len() < 8, "Password '{}' should be invalid", password);
+            assert!(
+                password.len() < 8,
+                "Password '{}' should be invalid",
+                password
+            );
         }
     }
 
     #[test]
     fn test_mock_email_sender() {
         let sender = MockEmailSender::new();
-        
+
         let result = sender.send_password_reset_email(
             "test@example.com",
-            "https://example.com/reset?token=abc123"
+            "https://example.com/reset?token=abc123",
         );
-        
+
         assert!(result.is_ok());
-        
+
         let emails = sender.get_sent_emails();
         assert_eq!(emails.len(), 1);
         assert_eq!(emails[0].0, "test@example.com");

@@ -2,7 +2,7 @@
 //!
 //! 提供用于 SeaORM 实体的加密字段类型，支持透明加解密。
 
-use crate::utils::{EncryptionService, EncryptedString};
+use crate::utils::{EncryptedString, EncryptionService};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -213,13 +213,11 @@ mod tests {
         let enc = create_test_encryption_service();
         let plain = "secret-data";
 
-        let encrypted =
-            EncryptionHelper::encrypt_field(Some(plain), Some(&enc)).unwrap();
+        let encrypted = EncryptionHelper::encrypt_field(Some(plain), Some(&enc)).unwrap();
         assert!(encrypted.is_some());
         assert_ne!(encrypted.as_ref().unwrap(), plain);
 
-        let decrypted =
-            EncryptionHelper::decrypt_field(encrypted.as_deref(), Some(&enc)).unwrap();
+        let decrypted = EncryptionHelper::decrypt_field(encrypted.as_deref(), Some(&enc)).unwrap();
         assert_eq!(decrypted, Some(plain.to_string()));
     }
 

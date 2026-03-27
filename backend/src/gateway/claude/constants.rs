@@ -12,7 +12,8 @@ pub const BETA_CONTEXT_1M: &str = "context-1m-2025-08-07";
 pub const DEFAULT_BETA_HEADER: &str = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
 
 /// API Key 账号 Beta Header（不包含 oauth）
-pub const API_KEY_BETA_HEADER: &str = "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
+pub const API_KEY_BETA_HEADER: &str =
+    "claude-code-20250219,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
 
 /// Haiku 模型 Beta Header（OAuth）
 pub const HAIKU_OAUTH_BETA_HEADER: &str = "oauth-2025-04-20,interleaved-thinking-2025-05-14";
@@ -34,7 +35,7 @@ pub const MODEL_ID_OVERRIDES: &[(&str, &str)] = &[
 /// 获取 Beta Header
 pub fn get_beta_header(is_oauth: bool, model: &str) -> String {
     let is_haiku = model.to_lowercase().contains("haiku");
-    
+
     if is_oauth {
         if is_haiku {
             HAIKU_OAUTH_BETA_HEADER.to_string()
@@ -82,35 +83,35 @@ pub const DEFAULT_MODELS: &[(&str, &str)] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_get_beta_header_oauth() {
         let beta = get_beta_header(true, "claude-sonnet-4-5");
         assert!(beta.contains(BETA_CLAUDE_CODE));
         assert!(beta.contains(BETA_OAUTH));
     }
-    
+
     #[test]
     fn test_get_beta_header_api_key() {
         let beta = get_beta_header(false, "claude-sonnet-4-5");
         assert!(beta.contains(BETA_CLAUDE_CODE));
         assert!(!beta.contains(BETA_OAUTH));
     }
-    
+
     #[test]
     fn test_get_beta_header_haiku_oauth() {
         let beta = get_beta_header(true, "claude-haiku-4-5");
         assert!(beta.contains(BETA_OAUTH));
         assert!(!beta.contains(BETA_CLAUDE_CODE));
     }
-    
+
     #[test]
     fn test_get_beta_header_haiku_api_key() {
         let beta = get_beta_header(false, "claude-haiku-4-5");
         assert!(!beta.contains(BETA_OAUTH));
         assert!(!beta.contains(BETA_CLAUDE_CODE));
     }
-    
+
     #[test]
     fn test_normalize_model_id() {
         assert_eq!(
@@ -122,7 +123,7 @@ mod tests {
             "claude-sonnet-4-5-20250929"
         );
     }
-    
+
     #[test]
     fn test_denormalize_model_id() {
         assert_eq!(

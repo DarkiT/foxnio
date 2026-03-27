@@ -2,12 +2,14 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Config, ServerConfig, DatabaseConfig, RedisConfig, JwtConfig, GatewayConfig};
+    use crate::config::{
+        Config, DatabaseConfig, GatewayConfig, JwtConfig, RedisConfig, ServerConfig,
+    };
 
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        
+
         assert_eq!(config.server.host, "0.0.0.0");
         assert_eq!(config.server.port, 8080);
         assert_eq!(config.server.mode, "debug");
@@ -26,7 +28,7 @@ mod tests {
             },
             ..Default::default()
         };
-        
+
         let url = config.database_url();
         assert_eq!(url, "postgres://postgres:secret@localhost:5432/foxnio");
     }
@@ -42,7 +44,7 @@ mod tests {
             },
             ..Default::default()
         };
-        
+
         let url = config.redis_url();
         assert_eq!(url, "redis://localhost:6379/0");
     }
@@ -58,7 +60,7 @@ mod tests {
             },
             ..Default::default()
         };
-        
+
         let url = config.redis_url();
         assert_eq!(url, "redis://:secret@localhost:6379/1");
     }
@@ -71,7 +73,7 @@ mod tests {
             api_key_prefix: "fx-".to_string(),
             rate_multiplier: 1.5,
         };
-        
+
         assert_eq!(config.user_concurrency, 5);
         assert_eq!(config.user_balance, 1000);
         assert_eq!(config.api_key_prefix, "fx-");

@@ -15,24 +15,20 @@ use axum::{
     },
     middleware::Next,
 };
-use bytes::{Buf, Bytes, BytesMut};
-use flate2::{
-    read::GzDecoder,
-    write::GzEncoder,
-    Compression as GzCompression,
-};
 use brotli::{CompressorReader, Decompressor};
+use bytes::{Buf, Bytes, BytesMut};
+use flate2::{read::GzDecoder, write::GzEncoder, Compression as GzCompression};
+use futures::stream::{Stream, StreamExt};
+use pin_project_lite::pin_project;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::{
     io::{Read, Write},
     sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
 use tokio::sync::RwLock;
-use std::sync::Arc;
-use pin_project_lite::pin_project;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use futures::stream::{Stream, StreamExt};
 
 /// 压缩级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,9 +275,13 @@ impl CompressionLayer {
     }
 
     /// 压缩数据
-    pub fn compress(&self, data: &[u8], encoding: ContentEncoding) -> anyhow::Result<CompressedResponse> {
+    pub fn compress(
+        &self,
+        data: &[u8],
+        encoding: ContentEncoding,
+    ) -> anyhow::Result<CompressedResponse> {
         let original_size = data.len();
-        
+
         // 检查是否需要压缩
         if original_size < self.min_size || encoding == ContentEncoding::Identity {
             return Ok(CompressedResponse {
@@ -294,7 +294,7 @@ impl CompressionLayer {
         }
 
         let start = Instant::now();
-        
+
         let (body, encoding) = match encoding {
             ContentEncoding::Gzip => {
                 let compressed = self.compress_gzip(data)?;
@@ -304,20 +304,15 @@ impl CompressionLayer {
                 let compressed = self.compress_brotli(data)?;
                 (compressed, ContentEncoding::Brotli)
             }
-            ContentEncoding::Identity => {
-                (Bytes::copy_from_slice(data), ContentEncoding::Identity)
-            }
+            ContentEncoding::Identity => (Bytes::copy_from_slice(data), ContentEncoding::Identity),
         };
 
         let compressed_size = body.len();
         let compression_time_ms = start.elapsed().as_millis() as u64;
 
         // 更新统计
-        self.stats.record_compression(
-            original_size,
-            compressed_size,
-            compression_time_ms,
-        );
+        self.stats
+            .record_compression(original_size, compressed_size, compression_time_ms);
 
         Ok(CompressedResponse {
             body,
@@ -365,11 +360,8 @@ impl CompressionLayer {
         let decompression_time_ms = start.elapsed().as_millis() as u64;
 
         // 更新统计
-        self.stats.record_decompression(
-            original_size,
-            decompressed.len(),
-            decompression_time_ms,
-        );
+        self.stats
+            .record_decompression(original_size, decompressed.len(), decompression_time_ms);
 
         Ok(decompressed)
     }
@@ -416,17 +408,23 @@ impl CompressionStats {
     /// 记录压缩操作
     fn record_compression(&self, original_size: usize, compressed_size: usize, time_ms: u64) {
         self.compress_count.fetch_add(1, Ordering::Relaxed);
-        self.total_original_size.fetch_add(original_size as u64, Ordering::Relaxed);
-        self.total_compressed_size.fetch_add(compressed_size as u64, Ordering::Relaxed);
-        self.total_compression_time_ms.fetch_add(time_ms, Ordering::Relaxed);
+        self.total_original_size
+            .fetch_add(original_size as u64, Ordering::Relaxed);
+        self.total_compressed_size
+            .fetch_add(compressed_size as u64, Ordering::Relaxed);
+        self.total_compression_time_ms
+            .fetch_add(time_ms, Ordering::Relaxed);
     }
 
     /// 记录解压缩操作
     fn record_decompression(&self, compressed_size: usize, decompressed_size: usize, time_ms: u64) {
         self.decompress_count.fetch_add(1, Ordering::Relaxed);
-        self.total_compressed_size.fetch_add(compressed_size as u64, Ordering::Relaxed);
-        self.total_original_size.fetch_add(decompressed_size as u64, Ordering::Relaxed);
-        self.total_decompression_time_ms.fetch_add(time_ms, Ordering::Relaxed);
+        self.total_compressed_size
+            .fetch_add(compressed_size as u64, Ordering::Relaxed);
+        self.total_original_size
+            .fetch_add(decompressed_size as u64, Ordering::Relaxed);
+        self.total_decompression_time_ms
+            .fetch_add(time_ms, Ordering::Relaxed);
     }
 
     /// 获取统计快照
@@ -523,9 +521,21 @@ impl std::fmt::Display for StatsSnapshot {
             self.bytes_saved,
             self.bytes_saved as f64 / 1_048_576.0
         )?;
-        writeln!(f, "  Compression ratio: {:.2}%", self.compression_ratio * 100.0)?;
-        writeln!(f, "  Avg compression time: {:.2} ms", self.avg_compression_time_ms)?;
-        writeln!(f, "  Avg decompression time: {:.2} ms", self.avg_decompression_time_ms)
+        writeln!(
+            f,
+            "  Compression ratio: {:.2}%",
+            self.compression_ratio * 100.0
+        )?;
+        writeln!(
+            f,
+            "  Avg compression time: {:.2} ms",
+            self.avg_compression_time_ms
+        )?;
+        writeln!(
+            f,
+            "  Avg decompression time: {:.2} ms",
+            self.avg_decompression_time_ms
+        )
     }
 }
 
@@ -557,19 +567,12 @@ impl StreamingCompressor {
             ContentEncoding::Brotli => {
                 let mut compressed = Vec::new();
                 {
-                    let mut encoder = CompressorReader::new(
-                        chunk,
-                        4096,
-                        self.level.into(),
-                        22,
-                    );
+                    let mut encoder = CompressorReader::new(chunk, 4096, self.level.into(), 22);
                     std::io::copy(&mut encoder, &mut compressed)?;
                 }
                 Ok(Bytes::from(compressed))
             }
-            ContentEncoding::Identity => {
-                Ok(Bytes::copy_from_slice(chunk))
-            }
+            ContentEncoding::Identity => Ok(Bytes::copy_from_slice(chunk)),
         }
     }
 }
@@ -624,52 +627,51 @@ pub fn should_compress(headers: &HeaderMap) -> bool {
     }
 
     // 检查是否为可压缩类型
-    compressible_types.iter().any(|t| content_type.starts_with(t))
+    compressible_types
+        .iter()
+        .any(|t| content_type.starts_with(t))
 }
 
 /// 响应压缩中间件
-pub async fn compression_middleware(
-    req: Request<Body>,
-    next: Next,
-) -> Response<Body> {
+pub async fn compression_middleware(req: Request<Body>, next: Next) -> Response<Body> {
     let compression_layer = CompressionLayer::new();
-    
+
     // 获取 Accept-Encoding
     let accept_encoding = get_accept_encoding(req.headers());
     let encoding = compression_layer.select_encoding(accept_encoding);
-    
+
     // 执行请求
     let mut response = next.run(req).await;
-    
+
     // 检查是否需要压缩响应
     if encoding == ContentEncoding::Identity || !should_compress(response.headers()) {
         return response;
     }
-    
+
     // 获取响应体
     let (parts, body) = response.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024 * 10).await {
         Ok(b) => b,
         Err(_) => return Response::from_parts(parts, Body::empty()),
     };
-    
+
     // 检查大小
     if body_bytes.len() < compression_layer.min_size {
         let mut builder = Response::from_parts(parts, Body::from(body_bytes));
         return builder;
     }
-    
+
     // 压缩响应
     let compressed = match compression_layer.compress(&body_bytes, encoding) {
         Ok(c) => c,
         Err(_) => return Response::from_parts(parts, Body::from(body_bytes)),
     };
-    
+
     // 构建新响应
     let mut builder = Response::builder()
         .status(parts.status)
         .version(parts.version);
-    
+
     // 复制头部
     if let Some(headers) = builder.headers_mut() {
         for (name, value) in parts.headers.iter() {
@@ -678,68 +680,68 @@ pub async fn compression_middleware(
                 headers.insert(name.clone(), value.clone());
             }
         }
-        
+
         // 添加 Content-Encoding
         headers.insert(
             CONTENT_ENCODING,
             HeaderValue::from_str(&compressed.encoding.to_string()).unwrap(),
         );
-        
+
         // 更新 Content-Length
         headers.insert(
             CONTENT_LENGTH,
             HeaderValue::from(compressed.compressed_size),
         );
     }
-    
+
     // 添加压缩统计扩展
     if let Some(extensions) = builder.extensions_mut() {
         extensions.insert(compressed.clone());
     }
-    
+
     builder.body(Body::from(compressed.body)).unwrap()
 }
 
 /// 请求解压缩中间件
-pub async fn decompression_middleware(
-    mut req: Request<Body>,
-    next: Next,
-) -> Response<Body> {
+pub async fn decompression_middleware(mut req: Request<Body>, next: Next) -> Response<Body> {
     let compression_layer = CompressionLayer::new();
-    
+
     // 获取 Content-Encoding
     let encoding = get_content_encoding(req.headers());
-    
+
     if encoding == ContentEncoding::Identity {
         return next.run(req).await;
     }
-    
+
     // 解压缩请求体
     let body = req.into_parts().1;
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024 * 10).await {
         Ok(b) => b,
-        Err(_) => return Response::builder()
-            .status(400)
-            .body(Body::from("Failed to read request body"))
-            .unwrap(),
+        Err(_) => {
+            return Response::builder()
+                .status(400)
+                .body(Body::from("Failed to read request body"))
+                .unwrap()
+        }
     };
-    
+
     let decompressed = match compression_layer.decompress(&body_bytes, encoding) {
         Ok(d) => d,
-        Err(e) => return Response::builder()
-            .status(400)
-            .body(Body::from(format!("Decompression failed: {}", e)))
-            .unwrap(),
+        Err(e) => {
+            return Response::builder()
+                .status(400)
+                .body(Body::from(format!("Decompression failed: {}", e)))
+                .unwrap()
+        }
     };
-    
+
     // 更新请求
     let (mut parts, _) = req.into_parts();
     parts.headers.remove(CONTENT_ENCODING);
-    parts.headers.insert(
-        CONTENT_LENGTH,
-        HeaderValue::from(decompressed.len()),
-    );
-    
+    parts
+        .headers
+        .insert(CONTENT_LENGTH, HeaderValue::from(decompressed.len()));
+
     let new_req = Request::from_parts(parts, Body::from(decompressed));
     next.run(new_req).await
 }
@@ -760,31 +762,25 @@ mod tests {
     #[test]
     fn test_select_encoding_with_accept_header() {
         let layer = CompressionLayer::new();
-        
+
         // 只支持 gzip
-        assert_eq!(
-            layer.select_encoding(Some("gzip")),
-            ContentEncoding::Gzip
-        );
-        
+        assert_eq!(layer.select_encoding(Some("gzip")), ContentEncoding::Gzip);
+
         // 只支持 brotli
-        assert_eq!(
-            layer.select_encoding(Some("br")),
-            ContentEncoding::Brotli
-        );
-        
+        assert_eq!(layer.select_encoding(Some("br")), ContentEncoding::Brotli);
+
         // 两者都支持，优先 brotli
         assert_eq!(
             layer.select_encoding(Some("gzip, br")),
             ContentEncoding::Brotli
         );
-        
+
         // 带 quality 值
         assert_eq!(
             layer.select_encoding(Some("gzip, br;q=0.9")),
             ContentEncoding::Gzip
         );
-        
+
         // 不支持的编码
         assert_eq!(
             layer.select_encoding(Some("deflate")),
@@ -794,14 +790,12 @@ mod tests {
 
     #[test]
     fn test_compress_gzip() {
-        let layer = CompressionLayer::new()
-            .brotli(false);
-        
-        let data = b"Hello, World! This is a test string that should compress well. "
-            .repeat(10);
-        
+        let layer = CompressionLayer::new().brotli(false);
+
+        let data = b"Hello, World! This is a test string that should compress well. ".repeat(10);
+
         let result = layer.compress(&data, ContentEncoding::Gzip).unwrap();
-        
+
         assert_eq!(result.encoding, ContentEncoding::Gzip);
         assert!(result.compressed_size < result.original_size);
         assert!(result.compression_ratio() > 0.0);
@@ -809,14 +803,12 @@ mod tests {
 
     #[test]
     fn test_compress_brotli() {
-        let layer = CompressionLayer::new()
-            .gzip(false);
-        
-        let data = b"Hello, World! This is a test string that should compress well. "
-            .repeat(10);
-        
+        let layer = CompressionLayer::new().gzip(false);
+
+        let data = b"Hello, World! This is a test string that should compress well. ".repeat(10);
+
         let result = layer.compress(&data, ContentEncoding::Brotli).unwrap();
-        
+
         assert_eq!(result.encoding, ContentEncoding::Brotli);
         assert!(result.compressed_size < result.original_size);
         assert!(result.compression_ratio() > 0.0);
@@ -824,13 +816,12 @@ mod tests {
 
     #[test]
     fn test_compress_small_data() {
-        let layer = CompressionLayer::new()
-            .min_size(1024);
-        
+        let layer = CompressionLayer::new().min_size(1024);
+
         let data = b"small";
-        
+
         let result = layer.compress(data, ContentEncoding::Gzip).unwrap();
-        
+
         // 小于最小大小，不压缩
         assert_eq!(result.encoding, ContentEncoding::Identity);
         assert_eq!(result.original_size, result.compressed_size);
@@ -839,38 +830,42 @@ mod tests {
     #[test]
     fn test_decompress_gzip() {
         let layer = CompressionLayer::new();
-        
+
         let original = b"Hello, World! This is a test string.";
         let compressed = layer.compress(original, ContentEncoding::Gzip).unwrap();
-        
-        let decompressed = layer.decompress(&compressed.body, ContentEncoding::Gzip).unwrap();
-        
+
+        let decompressed = layer
+            .decompress(&compressed.body, ContentEncoding::Gzip)
+            .unwrap();
+
         assert_eq!(decompressed.as_ref(), original);
     }
 
     #[test]
     fn test_decompress_brotli() {
         let layer = CompressionLayer::new();
-        
+
         let original = b"Hello, World! This is a test string.";
         let compressed = layer.compress(original, ContentEncoding::Brotli).unwrap();
-        
-        let decompressed = layer.decompress(&compressed.body, ContentEncoding::Brotli).unwrap();
-        
+
+        let decompressed = layer
+            .decompress(&compressed.body, ContentEncoding::Brotli)
+            .unwrap();
+
         assert_eq!(decompressed.as_ref(), original);
     }
 
     #[test]
     fn test_stats() {
         let layer = CompressionLayer::new();
-        
+
         // 压缩一些数据
         let data = b"Test data for compression statistics";
         layer.compress(data, ContentEncoding::Gzip).unwrap();
         layer.compress(data, ContentEncoding::Brotli).unwrap();
-        
+
         let stats = layer.stats().snapshot();
-        
+
         assert_eq!(stats.compress_count, 2);
         assert!(stats.total_original_size > 0);
         assert!(stats.total_compressed_size > 0);
@@ -879,20 +874,29 @@ mod tests {
     #[test]
     fn test_compression_ratio() {
         let layer = CompressionLayer::new();
-        
+
         // 重复数据压缩率高
         let data = b"a".repeat(1000);
         let result = layer.compress(&data, ContentEncoding::Gzip).unwrap();
-        
+
         // gzip 应该能显著压缩重复数据
         assert!(result.compression_ratio() > 0.5);
     }
 
     #[test]
     fn test_content_encoding_parse() {
-        assert_eq!(ContentEncoding::from_str("gzip").unwrap(), ContentEncoding::Gzip);
-        assert_eq!(ContentEncoding::from_str("br").unwrap(), ContentEncoding::Brotli);
-        assert_eq!(ContentEncoding::from_str("identity").unwrap(), ContentEncoding::Identity);
+        assert_eq!(
+            ContentEncoding::from_str("gzip").unwrap(),
+            ContentEncoding::Gzip
+        );
+        assert_eq!(
+            ContentEncoding::from_str("br").unwrap(),
+            ContentEncoding::Brotli
+        );
+        assert_eq!(
+            ContentEncoding::from_str("identity").unwrap(),
+            ContentEncoding::Identity
+        );
         assert!(ContentEncoding::from_str("unknown").is_err());
     }
 
@@ -902,14 +906,14 @@ mod tests {
         let _: GzCompression = CompressionLevel::Fast.into();
         let _: GzCompression = CompressionLevel::Default.into();
         let _: GzCompression = CompressionLevel::Best.into();
-        
+
         // Brotli 级别
         let level: u32 = CompressionLevel::Fast.into();
         assert_eq!(level, 1);
-        
+
         let level: u32 = CompressionLevel::Default.into();
         assert_eq!(level, 6);
-        
+
         let level: u32 = CompressionLevel::Best.into();
         assert_eq!(level, 11);
     }
@@ -926,13 +930,13 @@ mod benches {
         let layer = CompressionLayer::new()
             .brotli(false)
             .level(CompressionLevel::Default);
-        
+
         let data = b"x".repeat(1_000_000); // 1MB
-        
+
         let start = Instant::now();
         let result = layer.compress(&data, ContentEncoding::Gzip).unwrap();
         let elapsed = start.elapsed();
-        
+
         println!(
             "Gzip: {} bytes -> {} bytes in {:?} ({:.2}x compression)",
             result.original_size,
@@ -947,13 +951,13 @@ mod benches {
         let layer = CompressionLayer::new()
             .gzip(false)
             .level(CompressionLevel::Default);
-        
+
         let data = b"x".repeat(1_000_000); // 1MB
-        
+
         let start = Instant::now();
         let result = layer.compress(&data, ContentEncoding::Brotli).unwrap();
         let elapsed = start.elapsed();
-        
+
         println!(
             "Brotli: {} bytes -> {} bytes in {:?} ({:.2}x compression)",
             result.original_size,
@@ -966,20 +970,34 @@ mod benches {
     #[test]
     fn bench_mixed_content() {
         let layer = CompressionLayer::new();
-        
+
         // JSON-like content
         let json = r#"{"key": "value", "nested": {"a": 1, "b": 2}}"#.repeat(1000);
-        
+
         let start = Instant::now();
-        let gzip_result = layer.compress(json.as_bytes(), ContentEncoding::Gzip).unwrap();
+        let gzip_result = layer
+            .compress(json.as_bytes(), ContentEncoding::Gzip)
+            .unwrap();
         let gzip_time = start.elapsed();
-        
+
         let start = Instant::now();
-        let brotli_result = layer.compress(json.as_bytes(), ContentEncoding::Brotli).unwrap();
+        let brotli_result = layer
+            .compress(json.as_bytes(), ContentEncoding::Brotli)
+            .unwrap();
         let brotli_time = start.elapsed();
-        
+
         println!("JSON content compression:");
-        println!("  Gzip: {} -> {} in {:?}", json.len(), gzip_result.compressed_size, gzip_time);
-        println!("  Brotli: {} -> {} in {:?}", json.len(), brotli_result.compressed_size, brotli_time);
+        println!(
+            "  Gzip: {} -> {} in {:?}",
+            json.len(),
+            gzip_result.compressed_size,
+            gzip_time
+        );
+        println!(
+            "  Brotli: {} -> {} in {:?}",
+            json.len(),
+            brotli_result.compressed_size,
+            brotli_time
+        );
     }
 }
