@@ -1,5 +1,6 @@
 //! 日志工具
 
+#![allow(dead_code)]
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// 初始化日志

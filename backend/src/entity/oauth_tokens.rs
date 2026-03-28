@@ -2,6 +2,7 @@
 //!
 //! 存储 OAuth 令牌，支持加密存储 access_token 和 refresh_token
 
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,7 @@ impl OAuthProviderType {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "anthropic" => Self::Anthropic,
             "openai" => Self::OpenAI,
@@ -106,7 +107,7 @@ impl Model {
 
     /// 获取 OAuth 提供商类型
     pub fn provider_type(&self) -> OAuthProviderType {
-        OAuthProviderType::from_str(&self.provider)
+        OAuthProviderType::parse(&self.provider)
     }
 
     /// 是否有 refresh_token
@@ -182,7 +183,7 @@ mod tests {
     fn test_oauth_provider_type() {
         assert_eq!(OAuthProviderType::Anthropic.as_str(), "anthropic");
         assert_eq!(
-            OAuthProviderType::from_str("openai"),
+            OAuthProviderType::parse("openai"),
             OAuthProviderType::OpenAI
         );
     }

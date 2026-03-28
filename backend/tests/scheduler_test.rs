@@ -11,7 +11,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -860,8 +860,8 @@ async fn test_different_sessions_different_accounts() {
         ..Default::default()
     };
 
-    let result1 = scheduler.select(&ctx1).await.unwrap();
-    let result2 = scheduler.select(&ctx2).await.unwrap();
+    let _result1 = scheduler.select(&ctx1).await.unwrap();
+    let _result2 = scheduler.select(&ctx2).await.unwrap();
 
     // 不同会话可能选择不同账号
     // (取决于轮询位置，但会话绑定后应该稳定)
@@ -1272,17 +1272,17 @@ async fn test_cost_sensitive_selection() {
     assert_eq!(result.unwrap().account.id, cheap_id);
 }
 
-#[test]
-fn test_metrics_cost_tracking() {
+#[tokio::test]
+async fn test_metrics_cost_tracking() {
     let metrics = AccountMetrics::new();
 
     metrics.record_request_start();
-    metrics.record_request_success(100, Some(150)).await;
+    metrics.record_request_success(100, Some(150));
 
     assert_eq!(metrics.get_total_cost_cents(), 150);
 
     metrics.record_request_start();
-    metrics.record_request_success(50, Some(75)).await;
+    metrics.record_request_success(50, Some(75));
 
     assert_eq!(metrics.get_total_cost_cents(), 225);
 }

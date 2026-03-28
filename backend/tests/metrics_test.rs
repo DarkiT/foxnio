@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 // 注意：这些测试需要在集成测试环境中运行
 // 因为它们依赖于 prometheus 和 lazy_static 的全局状态
@@ -120,7 +120,7 @@ fn test_metrics_performance_impact() {
     // 测量带指标的操作时间
     let metrics = TestMetrics::new();
     let start = Instant::now();
-    for i in 0..ITERATIONS {
+    for _i in 0..ITERATIONS {
         metrics.increment_counter("test_counter");
     }
     let metrics_duration = start.elapsed();
@@ -451,7 +451,7 @@ fn test_memory_efficiency() {
 // ============================================================================
 
 /// 测试用的指标结构体
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct TestMetrics {
     total_requests: std::sync::atomic::AtomicU64,
     success_requests: std::sync::atomic::AtomicU64,
@@ -727,24 +727,28 @@ impl TestMetrics {
 
         let mut output = String::new();
 
+        output.push_str("# HELP foxnio_requests_total Total number of requests\n");
         output.push_str("# TYPE foxnio_requests_total counter\n");
         output.push_str(&format!(
             "foxnio_requests_total {}\n",
             self.total_requests.load(Ordering::SeqCst)
         ));
 
+        output.push_str("# HELP foxnio_cache_hits Number of cache hits\n");
         output.push_str("# TYPE foxnio_cache_hits counter\n");
         output.push_str(&format!(
             "foxnio_cache_hits {}\n",
             self.cache_hits.load(Ordering::SeqCst)
         ));
 
+        output.push_str("# HELP foxnio_cache_misses Number of cache misses\n");
         output.push_str("# TYPE foxnio_cache_misses counter\n");
         output.push_str(&format!(
             "foxnio_cache_misses {}\n",
             self.cache_misses.load(Ordering::SeqCst)
         ));
 
+        output.push_str("# HELP foxnio_total_cost Total cost in dollars\n");
         output.push_str("# TYPE foxnio_total_cost gauge\n");
         output.push_str(&format!(
             "foxnio_total_cost {}\n",

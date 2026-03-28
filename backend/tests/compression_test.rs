@@ -1,13 +1,12 @@
 //! 压缩中间件测试
 
-use std::time::Instant;
-
 // 测试各种大小内容的压缩
 #[test]
 fn test_various_sizes_compression() {
-    use crate::gateway::middleware::compression::{
+    use foxnio::gateway::middleware::compression::{
         CompressionLayer, CompressionLevel, ContentEncoding,
     };
+    use std::time::Instant;
 
     let layer = CompressionLayer::new().min_size(100);
 
@@ -52,9 +51,7 @@ fn test_various_sizes_compression() {
 // 测试 gzip vs brotli 压缩率
 #[test]
 fn test_compression_ratio_comparison() {
-    use crate::gateway::middleware::compression::{
-        CompressionLayer, CompressionLevel, ContentEncoding,
-    };
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
 
     let layer = CompressionLayer::new().min_size(100);
 
@@ -98,9 +95,10 @@ fn test_compression_ratio_comparison() {
 // 测试压缩级别
 #[test]
 fn test_compression_levels() {
-    use crate::gateway::middleware::compression::{
+    use foxnio::gateway::middleware::compression::{
         CompressionLayer, CompressionLevel, ContentEncoding,
     };
+    use std::time::Instant;
 
     let data = vec![b'x'; 100_000];
 
@@ -155,15 +153,20 @@ fn test_compression_levels() {
 // 测试解压缩
 #[test]
 fn test_roundtrip_compression() {
-    use crate::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
 
-    let layer = CompressionLayer::new();
-    let original = b"Hello, World! This is a test string for compression.";
+    let layer = CompressionLayer::new().min_size(10);
+    let original = b"Hello, World! This is a test string for compression that is long enough.";
 
     println!("\n=== Roundtrip Compression Test ===\n");
 
     // Gzip roundtrip
     let compressed = layer.compress(original, ContentEncoding::Gzip).unwrap();
+    assert_eq!(
+        compressed.encoding,
+        ContentEncoding::Gzip,
+        "Data should be compressed"
+    );
     let decompressed = layer
         .decompress(&compressed.body, ContentEncoding::Gzip)
         .unwrap();
@@ -176,6 +179,11 @@ fn test_roundtrip_compression() {
 
     // Brotli roundtrip
     let compressed = layer.compress(original, ContentEncoding::Brotli).unwrap();
+    assert_eq!(
+        compressed.encoding,
+        ContentEncoding::Brotli,
+        "Data should be compressed"
+    );
     let decompressed = layer
         .decompress(&compressed.body, ContentEncoding::Brotli)
         .unwrap();
@@ -190,7 +198,7 @@ fn test_roundtrip_compression() {
 // 测试内容协商
 #[test]
 fn test_content_negotiation() {
-    use crate::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
 
     let layer = CompressionLayer::new();
 
@@ -217,13 +225,13 @@ fn test_content_negotiation() {
 // 测试压缩统计
 #[test]
 fn test_compression_stats() {
-    use crate::gateway::middleware::compression::CompressionLayer;
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
 
-    let layer = CompressionLayer::new();
+    let layer = CompressionLayer::new().min_size(500);
 
-    // 执行多次压缩
+    // 执行多次压缩 - 确保数据足够大以触发压缩
     for i in 0..10 {
-        let data = vec![b'x'; (i + 1) * 1000];
+        let data = vec![b'x'; (i + 1) * 1000]; // 1000, 2000, ... 10000 bytes
         layer.compress(&data, ContentEncoding::Gzip).unwrap();
     }
 
@@ -231,6 +239,8 @@ fn test_compression_stats() {
 
     println!("\n=== Compression Statistics ===\n");
     println!("{}", stats);
+
+    assert_eq!(stats.compress_count, 10);
 
     assert_eq!(stats.compress_count, 10);
     assert!(stats.total_original_size > 0);
@@ -246,9 +256,10 @@ fn test_compression_stats() {
 // 性能基准测试
 #[test]
 fn test_performance_benchmark() {
-    use crate::gateway::middleware::compression::{
+    use foxnio::gateway::middleware::compression::{
         CompressionLayer, CompressionLevel, ContentEncoding,
     };
+    use std::time::Instant;
 
     println!("\n=== Performance Benchmark ===\n");
 
@@ -306,7 +317,7 @@ fn test_performance_benchmark() {
 // 测试不同类型内容的压缩效果
 #[test]
 fn test_different_content_types() {
-    use crate::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
 
     let layer = CompressionLayer::new().min_size(100);
 
@@ -384,10 +395,10 @@ fn test_different_content_types() {
 // 零拷贝测试
 #[test]
 fn test_zero_copy_optimization() {
-    use crate::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
 
     let layer = CompressionLayer::new();
-    let original = vec![b'x'; 100_000];
+    let _original = vec![b'x'; 100_000];
 
     // 小于最小大小的数据不应压缩（直接返回）
     let small = vec![b'x'; 100];
@@ -403,7 +414,7 @@ fn test_zero_copy_optimization() {
 // 流式压缩测试
 #[test]
 fn test_streaming_compression() {
-    use crate::gateway::middleware::compression::{
+    use foxnio::gateway::middleware::compression::{
         CompressionLevel, ContentEncoding, StreamingCompressor,
     };
 
@@ -438,8 +449,9 @@ fn test_streaming_compression() {
 // 并发压缩测试
 #[tokio::test]
 async fn test_concurrent_compression() {
-    use crate::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
+    use foxnio::gateway::middleware::compression::{CompressionLayer, ContentEncoding};
     use std::sync::Arc;
+    use std::time::Instant;
     use tokio::task::JoinSet;
 
     let layer = Arc::new(CompressionLayer::new());

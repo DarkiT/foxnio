@@ -1,0 +1,152 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ModelConfigs::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ModelConfigs::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::Name)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(ColumnDef::new(ModelConfigs::Aliases).json())
+                    .col(
+                        ColumnDef::new(ModelConfigs::Provider)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::ApiName)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::DisplayName)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::InputPrice)
+                            .double()
+                            .not_null()
+                            .default(0.0),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::OutputPrice)
+                            .double()
+                            .not_null()
+                            .default(0.0),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::MaxTokens)
+                            .integer()
+                            .not_null()
+                            .default(4096),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::ContextWindow)
+                            .integer()
+                            .not_null()
+                            .default(8192),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::MaxConcurrent)
+                            .integer()
+                            .not_null()
+                            .default(5),
+                    )
+                    .col(ColumnDef::new(ModelConfigs::FallbackModels).json())
+                    .col(ColumnDef::new(ModelConfigs::Capabilities).json())
+                    .col(
+                        ColumnDef::new(ModelConfigs::SupportsStreaming)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::SupportsFunctionCalling)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::SupportsVision)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::Enabled)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::Priority)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ModelConfigs::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ModelConfigs::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+pub enum ModelConfigs {
+    Table,
+    Id,
+    Name,
+    Aliases,
+    Provider,
+    ApiName,
+    DisplayName,
+    InputPrice,
+    OutputPrice,
+    MaxTokens,
+    ContextWindow,
+    MaxConcurrent,
+    FallbackModels,
+    Capabilities,
+    SupportsStreaming,
+    SupportsFunctionCalling,
+    SupportsVision,
+    Enabled,
+    Priority,
+    CreatedAt,
+    UpdatedAt,
+}

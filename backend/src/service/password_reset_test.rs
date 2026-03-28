@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::service::email::MockEmailSender;
+    use crate::service::email::{EmailSender, MockEmailSender};
     use crate::service::password_reset::*;
 
     #[test]
@@ -38,12 +38,8 @@ mod tests {
     #[test]
     fn test_password_validation() {
         // 测试密码验证逻辑
-        let valid_passwords = vec![
-            "password123",
-            "MySecureP@ss",
-            "12345678",
-            "a".repeat(128).as_str(),
-        ];
+        let long_password = "a".repeat(128);
+        let valid_passwords: Vec<&str> = vec!["password123", "MySecureP@ss", "12345678"];
 
         let invalid_passwords = vec![
             "1234567", // 太短
@@ -57,6 +53,9 @@ mod tests {
                 password
             );
         }
+
+        // Test long password separately
+        assert!(long_password.len() >= 8, "Long password should be valid");
 
         for password in invalid_passwords {
             assert!(

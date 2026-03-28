@@ -2,25 +2,46 @@
 
 use async_trait::async_trait;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 
 use super::{AlertChannel, AlertSendResult, SlackChannelConfig};
 use crate::alert::{Alert, AlertChannelType};
+
+/// Slack 消息格式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackMessageFormat {
+    /// Block Kit 格式（默认）
+    #[default]
+    Blocks,
+    /// 附件格式
+    Attachment,
+}
 
 /// Slack 告警通道
 pub struct SlackChannel {
     config: SlackChannelConfig,
     client: Client,
     name: String,
+    /// 消息格式
+    format: SlackMessageFormat,
 }
 
 impl SlackChannel {
+    /// 创建新的 Slack 通道（使用默认 Block Kit 格式）
     pub fn new(config: SlackChannelConfig) -> Self {
+        Self::with_format(config, SlackMessageFormat::default())
+    }
+
+    /// 创建指定消息格式的 Slack 通道
+    pub fn with_format(config: SlackChannelConfig, format: SlackMessageFormat) -> Self {
         let name = "Slack".to_string();
         let client = Client::new();
         Self {
             config,
             client,
             name,
+            format,
         }
     }
 
@@ -131,8 +152,8 @@ impl SlackChannel {
         body
     }
 
-    /// 构建简单附件消息
-    fn build_attachment_message(&self, alert: &Alert) -> serde_json::Value {
+    /// 构建简单附件消息（备选格式）
+    pub fn build_attachment_message(&self, alert: &Alert) -> serde_json::Value {
         let level_color = self.get_level_color(&alert.level);
 
         // 构建字段
@@ -213,7 +234,10 @@ impl SlackChannel {
 #[async_trait]
 impl AlertChannel for SlackChannel {
     async fn send(&self, alert: &Alert) -> AlertSendResult {
-        let body = self.build_blocks_message(alert);
+        let body = match self.format {
+            SlackMessageFormat::Blocks => self.build_blocks_message(alert),
+            SlackMessageFormat::Attachment => self.build_attachment_message(alert),
+        };
 
         match self
             .client

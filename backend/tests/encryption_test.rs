@@ -7,10 +7,10 @@
 //! - 与实体集成
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use foxnio::utils::{
-    get_encryption_service, init_encryption_service_with_key, is_encryption_initialized,
-    EncryptedString, EncryptionError, EncryptionService,
+use foxnio::utils::encryption_global::{
+    init_encryption_service_with_key, is_encryption_initialized,
 };
+use foxnio::utils::{get_encryption_service, EncryptedString, EncryptionService};
 
 /// 创建测试用的加密服务
 fn create_test_encryption_service() -> EncryptionService {
@@ -122,7 +122,7 @@ mod encryption_tests {
         assert!(result.is_err());
 
         // 格式正确的无效密文
-        let mut fake_ciphertext = vec![0u8; 28]; // nonce(12) + tag(16)
+        let fake_ciphertext = vec![0u8; 28]; // nonce(12) + tag(16)
         let fake_base64 = BASE64.encode(&fake_ciphertext);
         let result = enc.decrypt(&fake_base64);
         assert!(result.is_err());

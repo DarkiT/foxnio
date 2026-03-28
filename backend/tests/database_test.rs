@@ -1,4 +1,6 @@
 //! 数据库集成测试
+//!
+//! 注意: 这些测试需要实际数据库连接,使用运行时查询而非编译时宏
 
 use sqlx::postgres::PgPoolOptions;
 
@@ -46,45 +48,45 @@ mod tests {
         let user_id = uuid::Uuid::new_v4();
         let email = format!("test_{}@example.com", user_id);
 
-        let result = sqlx::query!(
+        let result: Result<(uuid::Uuid,), sqlx::Error> = sqlx::query_as(
             r#"
             INSERT INTO users (id, email, password_hash, balance, role, status)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
             "#,
-            user_id,
-            email,
-            "hashed_password",
-            0i64,
-            "user",
-            "active"
         )
+        .bind(user_id)
+        .bind(&email)
+        .bind("hashed_password")
+        .bind(0i64)
+        .bind("user")
+        .bind("active")
         .fetch_one(&pool)
         .await;
 
         assert!(result.is_ok());
 
         // 查询用户
-        let user = sqlx::query!(
+        let user: Result<(uuid::Uuid, String, i64, String, String), sqlx::Error> = sqlx::query_as(
             r#"
             SELECT id, email, balance, role, status
             FROM users
             WHERE id = $1
             "#,
-            user_id
         )
+        .bind(user_id)
         .fetch_one(&pool)
         .await;
 
         assert!(user.is_ok());
         let user = user.unwrap();
-        assert_eq!(user.email, email);
+        assert_eq!(user.1, email);
 
         // 删除测试用户
-        sqlx::query!("DELETE FROM users WHERE id = $1", user_id)
+        let _: Result<_, sqlx::Error> = sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(user_id)
             .execute(&pool)
-            .await
-            .expect("Failed to delete test user");
+            .await;
     }
 
     #[tokio::test]
@@ -103,30 +105,30 @@ mod tests {
         // 创建测试账号
         let account_id = uuid::Uuid::new_v4();
 
-        let result = sqlx::query!(
+        let result: Result<(uuid::Uuid,), sqlx::Error> = sqlx::query_as(
             r#"
             INSERT INTO accounts (id, name, provider, api_key, status, priority, weight)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
             "#,
-            account_id,
-            "Test Account",
-            "openai",
-            "sk-test-key",
-            "active",
-            1i32,
-            1i32
         )
+        .bind(account_id)
+        .bind("Test Account")
+        .bind("openai")
+        .bind("sk-test-key")
+        .bind("active")
+        .bind(1i32)
+        .bind(1i32)
         .fetch_one(&pool)
         .await;
 
         assert!(result.is_ok());
 
         // 清理
-        sqlx::query!("DELETE FROM accounts WHERE id = $1", account_id)
+        let _: Result<_, sqlx::Error> = sqlx::query("DELETE FROM accounts WHERE id = $1")
+            .bind(account_id)
             .execute(&pool)
-            .await
-            .expect("Failed to delete test account");
+            .await;
     }
 
     #[tokio::test]
@@ -148,28 +150,29 @@ mod tests {
         let usage_id = uuid::Uuid::new_v4();
 
         // 插入使用记录
-        let result = sqlx::query!(
+        let result: Result<(uuid::Uuid,), sqlx::Error> = sqlx::query_as(
             r#"
             INSERT INTO usages (id, user_id, account_id, model, input_tokens, output_tokens, cost)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
             "#,
-            usage_id,
-            user_id,
-            account_id,
-            "gpt-4",
-            100i32,
-            50i32,
-            150i64
         )
+        .bind(usage_id)
+        .bind(user_id)
+        .bind(account_id)
+        .bind("gpt-4")
+        .bind(100i32)
+        .bind(50i32)
+        .bind(150i64)
         .fetch_one(&pool)
         .await;
 
         assert!(result.is_ok());
 
         // 查询使用统计
-        let stats = sqlx::query!(
-            r#"
+        let stats: Result<(i64, Option<i64>, Option<i64>, Option<i64>), sqlx::Error> =
+            sqlx::query_as(
+                r#"
             SELECT 
                 COUNT(*) as total_requests,
                 SUM(input_tokens) as total_input_tokens,
@@ -178,17 +181,17 @@ mod tests {
             FROM usages
             WHERE user_id = $1
             "#,
-            user_id
-        )
-        .fetch_one(&pool)
-        .await;
+            )
+            .bind(user_id)
+            .fetch_one(&pool)
+            .await;
 
         assert!(stats.is_ok());
 
         // 清理
-        sqlx::query!("DELETE FROM usages WHERE id = $1", usage_id)
+        let _: Result<_, sqlx::Error> = sqlx::query("DELETE FROM usages WHERE id = $1")
+            .bind(usage_id)
             .execute(&pool)
-            .await
-            .ok();
+            .await;
     }
 }

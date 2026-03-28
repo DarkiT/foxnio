@@ -1,21 +1,19 @@
 //! 完整请求转发实现
 
+#![allow(dead_code)]
 use anyhow::{bail, Result};
 use axum::{
     body::Body,
-    http::{HeaderMap, HeaderValue, Method, Request, StatusCode, Uri},
-    response::{IntoResponse, Response},
+    http::{HeaderMap, HeaderValue, StatusCode},
+    response::Response,
 };
 use bytes::Bytes;
-use futures::StreamExt;
 use reqwest::Client;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::entity::accounts;
-use crate::gateway::models::{resolve_model_alias, Model, ModelProvider};
+use crate::gateway::models::{resolve_model_alias, ModelProvider};
 use crate::gateway::SharedState;
-use crate::service::{AccountService, BillingService, ModelRouter, SchedulerService};
+use crate::service::{LegacyAccountService as AccountService, LegacyBillingService as BillingService, ModelRouter, SchedulerService};
 
 /// 请求上下文
 pub struct RequestContext {
@@ -209,10 +207,10 @@ impl GatewayHandler {
     /// 处理普通响应
     async fn handle_normal_response(
         &self,
-        state: &SharedState,
+        _state: &SharedState,
         ctx: RequestContext,
         response: reqwest::Response,
-        account_id: uuid::Uuid,
+        _account_id: uuid::Uuid,
     ) -> Result<Response> {
         let status = response.status();
 
@@ -245,17 +243,15 @@ impl GatewayHandler {
                 // 记录用量
                 let _ = self
                     .billing_service
-                    .record_usage(
-                        ctx.user_id,
-                        ctx.api_key_id,
-                        Some(account_id),
-                        model_name,
+                    .record_usage(crate::service::billing::RecordUsageParams {
+                        user_id: ctx.user_id,
+                        api_key_id: ctx.api_key_id,
+                        model: model_name.to_string(),
                         input_tokens,
                         output_tokens,
-                        None,
-                        true,
-                        None,
-                    )
+                        success: true,
+                        error_message: None,
+                    })
                     .await;
             }
         }
@@ -266,13 +262,11 @@ impl GatewayHandler {
     /// 处理流式响应
     async fn handle_streaming_response(
         &self,
-        state: &SharedState,
-        ctx: RequestContext,
+        _state: &SharedState,
+        _ctx: RequestContext,
         response: reqwest::Response,
-        account_id: uuid::Uuid,
+        _account_id: uuid::Uuid,
     ) -> Result<Response> {
-        use futures::stream::Stream;
-
         let status = response.status();
 
         // 构建响应

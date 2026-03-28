@@ -1,13 +1,32 @@
 //! HTTP 处理器模块
 
 pub mod admin;
+pub mod admin_accounts;
+pub mod admin_groups;
 pub mod alerts;
+pub mod announcement;
 pub mod audit;
 pub mod auth;
+pub mod backup;
+pub mod dashboard;
+pub mod error_passthrough_rule;
+pub mod groups;
 pub mod health;
 pub mod metrics;
+pub mod models;
+pub mod promo_code;
+pub mod proxy;
+pub mod quota;
+pub mod redeem;
+pub mod scheduled_test_plan;
+pub mod subscription;
+pub mod user;
+pub mod user_announcement;
+pub mod user_attribute;
+pub mod user_groups;
+pub mod verify;
 
-use axum::{http::StatusCode, Json};
+use axum::Json;
 use serde_json::json;
 
 // ApiError 定义
@@ -24,11 +43,10 @@ impl axum::response::IntoResponse for ApiError {
 }
 
 // 重新导出 auth 子模块
-pub use auth::{get_me, login, logout, logout_all, refresh, register};
 
 pub use health::{
     app_info, health_database, health_detailed, health_live, health_ready, health_redis,
-    health_resources, health_simple, metrics,
+    health_resources, health_simple,
 };
 
 pub use audit::{
@@ -36,8 +54,9 @@ pub use audit::{
     list_sensitive_audit_logs, list_user_audit_logs,
 };
 
-/// 列出可用模型 (OpenAI 兼容 API)
+/// 列出可用模型 (OpenAI 兼容 API) - 使用动态模型列表
 pub async fn list_models() -> Result<Json<serde_json::Value>, ApiError> {
+    // 使用静态模型列表作为回退
     use crate::gateway::models::{get_model_info, Model};
 
     let models: Vec<serde_json::Value> = Model::all()

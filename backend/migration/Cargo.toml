@@ -2,6 +2,15 @@
 name = "foxnio-migration"
 version = "0.1.0"
 edition = "2021"
+publish = false
+
+[lib]
+name = "migration"
+path = "src/lib.rs"
+
+[[bin]]
+name = "migration"
+path = "src/main.rs"
 
 [dependencies]
 sea-orm-migration = { version = "0.12", features = ["sqlx-postgres", "runtime-tokio-native-tls"] }

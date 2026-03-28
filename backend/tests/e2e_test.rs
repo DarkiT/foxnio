@@ -9,12 +9,14 @@ struct TestEnv {
     accounts: HashMap<String, TestAccount>,
 }
 
+#[derive(Clone)]
 struct TestUser {
     id: String,
     email: String,
     balance: i64,
 }
 
+#[derive(Clone)]
 struct TestApiKey {
     id: String,
     user_id: String,
@@ -22,6 +24,7 @@ struct TestApiKey {
     status: String,
 }
 
+#[derive(Clone)]
 struct TestAccount {
     id: String,
     name: String,
@@ -38,18 +41,18 @@ impl TestEnv {
         }
     }
 
-    fn create_user(&mut self, email: &str) -> &TestUser {
+    fn create_user(&mut self, email: &str) -> TestUser {
         let id = format!("user_{}", uuid::Uuid::new_v4());
         let user = TestUser {
             id: id.clone(),
             email: email.to_string(),
             balance: 0,
         };
-        self.users.insert(id.clone(), user);
-        self.users.get(&id).unwrap()
+        self.users.insert(id.clone(), user.clone());
+        user
     }
 
-    fn create_api_key(&mut self, user_id: &str) -> &TestApiKey {
+    fn create_api_key(&mut self, user_id: &str) -> TestApiKey {
         let id = format!("key_{}", uuid::Uuid::new_v4());
         let key = format!("sk-test-{}", uuid::Uuid::new_v4());
         let api_key = TestApiKey {
@@ -58,11 +61,11 @@ impl TestEnv {
             key: key.clone(),
             status: "active".to_string(),
         };
-        self.api_keys.insert(id.clone(), api_key);
-        self.api_keys.get(&id).unwrap()
+        self.api_keys.insert(id.clone(), api_key.clone());
+        api_key
     }
 
-    fn create_account(&mut self, name: &str, provider: &str) -> &TestAccount {
+    fn create_account(&mut self, name: &str, provider: &str) -> TestAccount {
         let id = format!("acc_{}", uuid::Uuid::new_v4());
         let account = TestAccount {
             id: id.clone(),
@@ -70,8 +73,8 @@ impl TestEnv {
             provider: provider.to_string(),
             status: "active".to_string(),
         };
-        self.accounts.insert(id.clone(), account);
-        self.accounts.get(&id).unwrap()
+        self.accounts.insert(id.clone(), account.clone());
+        account
     }
 }
 

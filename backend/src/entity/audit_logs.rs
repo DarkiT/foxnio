@@ -61,7 +61,7 @@ impl AuditAction {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "USER_LOGIN" => Some(Self::UserLogin),
             "USER_LOGOUT" => Some(Self::UserLogout),
@@ -142,7 +142,7 @@ impl ActiveModelBehavior for ActiveModel {}
 impl Model {
     /// 获取审计动作类型
     pub fn get_action(&self) -> Option<AuditAction> {
-        AuditAction::from_str(&self.action)
+        AuditAction::parse(&self.action)
     }
 
     /// 检查是否为敏感操作
@@ -182,7 +182,7 @@ pub struct SanitizedAuditLog {
 }
 
 /// IP 地址脱敏
-fn mask_ip(ip: &str) -> String {
+pub fn mask_ip(ip: &str) -> String {
     if ip.contains(':') {
         // IPv6: 保留前两段
         let parts: Vec<&str> = ip.split(':').collect();
@@ -203,7 +203,7 @@ fn mask_ip(ip: &str) -> String {
 }
 
 /// User Agent 脱敏（只保留浏览器/客户端名称）
-fn mask_user_agent(ua: &str) -> String {
+pub fn mask_user_agent(ua: &str) -> String {
     // 只保留前 50 个字符
     if ua.len() > 50 {
         format!("{}...", &ua[..50])
@@ -220,7 +220,7 @@ mod tests {
     fn test_audit_action() {
         assert_eq!(AuditAction::UserLogin.as_str(), "USER_LOGIN");
         assert_eq!(
-            AuditAction::from_str("USER_LOGIN"),
+            AuditAction::parse("USER_LOGIN"),
             Some(AuditAction::UserLogin)
         );
         assert!(AuditAction::UserLogin.is_sensitive());

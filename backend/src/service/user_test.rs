@@ -2,10 +2,11 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
+    use crate::service::user::Claims;
     use argon2::{
         password_hash::{rand_core::OsRng, SaltString},
-        Argon2, PasswordHasher,
+        Argon2, PasswordHasher, PasswordVerifier,
     };
 
     fn test_password_hash() -> String {
@@ -63,6 +64,8 @@ mod tests {
             role: "user".to_string(),
             exp: 9999999999,
             iat: 1700000000,
+            jti: None,
+            is_temp: false,
         };
 
         assert_eq!(claims.sub, "user-123");

@@ -5,6 +5,7 @@ mod tests {
     use crate::service::subscription::{
         PlanFeatures, SubscriptionPlan, SubscriptionStatus, UserQuota,
     };
+    use uuid::Uuid;
 
     #[test]
     fn test_subscription_status() {
@@ -59,26 +60,42 @@ mod tests {
     #[test]
     fn test_user_quota() {
         let quota = UserQuota {
-            daily_requests: 50,
-            daily_limit: Some(100),
-            monthly_tokens: 500000,
-            monthly_limit: Some(1000000),
+            user_id: Uuid::nil(),
+            subscription_id: None,
+            plan_name: None,
+            daily_requests_used: 50,
+            daily_requests_limit: Some(100),
+            monthly_tokens_used: 500000,
+            monthly_tokens_limit: Some(1000000),
             allowed_models: vec!["gpt-4".to_string(), "claude-3".to_string()],
+            priority: 0,
+            rate_limit: 60,
+            reset_daily_at: None,
+            reset_monthly_at: None,
         };
 
         // 检查是否在限制内
-        assert!(quota.daily_requests <= quota.daily_limit.unwrap());
-        assert!(quota.monthly_tokens <= quota.monthly_limit.unwrap());
+        assert!(!quota.is_daily_quota_exceeded());
+        assert!(!quota.is_monthly_quota_exceeded());
+        assert_eq!(quota.daily_remaining(), Some(50));
+        assert_eq!(quota.monthly_remaining(), Some(500000));
     }
 
     #[test]
     fn test_user_quota_wildcard() {
         let quota = UserQuota {
-            daily_requests: 0,
-            daily_limit: None,
-            monthly_tokens: 0,
-            monthly_limit: None,
+            user_id: Uuid::nil(),
+            subscription_id: None,
+            plan_name: None,
+            daily_requests_used: 0,
+            daily_requests_limit: None,
+            monthly_tokens_used: 0,
+            monthly_tokens_limit: None,
             allowed_models: vec!["*".to_string()],
+            priority: 0,
+            rate_limit: 60,
+            reset_daily_at: None,
+            reset_monthly_at: None,
         };
 
         // 通配符应该允许所有模型

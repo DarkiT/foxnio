@@ -7,16 +7,19 @@
 //! - 重试机制
 //! - 详细的错误信息
 //! - 系统资源监控
+//!
+//! 注意：部分功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 // ============================================================================
 // 核心类型定义
@@ -175,11 +178,11 @@ impl HealthChecker {
     }
 
     /// 执行单个检查（带超时和重试）
-    async fn run_check(&self, check: &Box<dyn HealthCheck>) -> CheckResult {
+    async fn run_check(&self, check: &dyn HealthCheck) -> CheckResult {
         let name = check.name().to_string();
         let critical = check.is_critical();
 
-        let mut last_error = String::new();
+        let mut last_error: String;
         let mut attempts = 0;
 
         loop {
@@ -234,7 +237,10 @@ impl HealthChecker {
         let checks = self.checks.read().await;
 
         // 并行执行所有检查
-        let futures: Vec<_> = checks.values().map(|c| self.run_check(c)).collect();
+        let futures: Vec<_> = checks
+            .values()
+            .map(|c| self.run_check(c.as_ref()))
+            .collect();
         let results = futures::future::join_all(futures).await;
 
         self.build_aggregate_status(results, start)
@@ -247,7 +253,7 @@ impl HealthChecker {
 
         let mut results = Vec::new();
         for check in checks.values() {
-            results.push(self.run_check(check).await);
+            results.push(self.run_check(check.as_ref()).await);
         }
 
         self.build_aggregate_status(results, start)
@@ -262,7 +268,7 @@ impl HealthChecker {
         let futures: Vec<_> = checks
             .values()
             .filter(|c| c.is_critical())
-            .map(|c| self.run_check(c))
+            .map(|c| self.run_check(c.as_ref()))
             .collect();
         let results = futures::future::join_all(futures).await;
 
@@ -273,7 +279,7 @@ impl HealthChecker {
     pub async fn check_one(&self, name: &str) -> Option<CheckResult> {
         let checks = self.checks.read().await;
         let check = checks.get(name)?;
-        Some(self.run_check(check).await)
+        Some(self.run_check(check.as_ref()).await)
     }
 
     /// 构建聚合状态

@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_openai_stream_chunk() {
-        use crate::gateway::stream::{OpenAIStreamChunk, OpenAIStreamParser};
+        use crate::gateway::stream::OpenAIStreamParser;
 
         let data = r#"{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}"#;
         let chunk = OpenAIStreamParser::parse_chunk(data);
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn test_openai_stream_finished() {
-        use crate::gateway::stream::{OpenAIStreamChunk, OpenAIStreamParser};
+        use crate::gateway::stream::OpenAIStreamParser;
 
         let data = r#"{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}"#;
         let chunk = OpenAIStreamParser::parse_chunk(data);
@@ -100,7 +100,7 @@ mod tests {
     fn test_usage_tracker() {
         use crate::gateway::stream::UsageTracker;
 
-        let mut tracker = UsageTracker::new();
+        let tracker = UsageTracker::new();
         let (input, output) = tracker.get_usage();
 
         assert_eq!(input, 0);

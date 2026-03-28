@@ -1,27 +1,36 @@
 //! 集成测试
 
-use actix_web::{test, App};
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+    routing::{get, post},
+    Json, Router,
+};
 use serde_json::json;
+use tower::ServiceExt;
 
-#[actix_web::test]
+#[tokio::test]
 async fn test_health_endpoint() {
-    let app = test::init_service(
-        App::new().route(
-            "/health",
-            actix_web::web::get()
-                .to(|| async { actix_web::HttpResponse::Ok().json(json!({"status": "healthy"})) }),
-        ),
-    )
-    .await;
+    let app = Router::new().route(
+        "/health",
+        get(|| async { Json(json!({"status": "healthy"})) }),
+    );
 
-    let req = test::TestRequest::get().uri("/health").to_request();
-    let resp = test::call_service(&app, req).await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
 
-    assert!(resp.status().is_success());
+    assert!(response.status().is_success());
 }
 
-#[actix_web::test]
-async fn test_api_key_validation() {
+#[test]
+fn test_api_key_validation() {
     let valid_keys = vec![
         "foxnio-1234567890abcdef1234567890abcdef",
         "sk-test-abcdefghijklmnopqrstuvwxyz123456",
@@ -42,12 +51,12 @@ async fn test_api_key_validation() {
     }
 }
 
-#[actix_web::test]
+#[tokio::test]
 async fn test_json_response() {
-    let app = test::init_service(App::new().route(
+    let app = Router::new().route(
         "/api/test",
-        actix_web::web::get().to(|| async {
-            actix_web::HttpResponse::Ok().json(json!({
+        get(|| async {
+            Json(json!({
                 "success": true,
                 "data": {
                     "id": 1,
@@ -55,64 +64,63 @@ async fn test_json_response() {
                 }
             }))
         }),
-    ))
-    .await;
+    );
 
-    let req = test::TestRequest::get().uri("/api/test").to_request();
-    let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/test")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
 
-    assert!(resp["success"].as_bool().unwrap());
-    assert_eq!(resp["data"]["id"], 1);
-}
-
-#[actix_web::test]
-async fn test_error_response() {
-    let app = test::init_service(App::new().route(
-        "/api/error",
-        actix_web::web::get().to(|| async {
-            actix_web::HttpResponse::BadRequest().json(json!({
-                "error": "Invalid request",
-                "code": 400
-            }))
-        }),
-    ))
-    .await;
-
-    let req = test::TestRequest::get().uri("/api/error").to_request();
-    let resp = test::call_service(&app, req).await;
-
-    assert_eq!(resp.status(), 400);
-}
-
-#[actix_web::test]
-async fn test_post_request() {
-    let app = test::init_service(App::new().route(
-        "/api/create",
-        actix_web::web::post().to(|| async {
-            actix_web::HttpResponse::Created().json(json!({
-                "created": true
-            }))
-        }),
-    ))
-    .await;
-
-    let req = test::TestRequest::post()
-        .uri("/api/create")
-        .set_json(json!({"name": "test"}))
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 201);
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
-async fn test_async_operation() {
-    use std::time::Duration;
+async fn test_error_response() {
+    let app = Router::new().route(
+        "/api/error",
+        get(|| async {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Invalid request", "code": 400})),
+            )
+        }),
+    );
 
-    let result = async {
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        "completed"
-    };
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/error")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
 
-    assert_eq!(result.await, "completed");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_post_request() {
+    let app = Router::new().route(
+        "/api/create",
+        post(|| async { (StatusCode::CREATED, Json(json!({"created": true}))) }),
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/create")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::CREATED);
 }

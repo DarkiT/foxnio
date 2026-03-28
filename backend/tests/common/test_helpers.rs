@@ -36,8 +36,8 @@ pub fn test_claims() -> serde_json::Value {
         "sub": test_user_id().to_string(),
         "email": test_email(),
         "role": "user",
-        "exp": 9999999999,
-        "iat": 1000000000
+        "exp": 9999999999_i64,
+        "iat": 1000000000_i64
     })
 }
 
@@ -47,8 +47,8 @@ pub fn test_admin_claims() -> serde_json::Value {
         "sub": test_user_id().to_string(),
         "email": "admin@example.com",
         "role": "admin",
-        "exp": 9999999999,
-        "iat": 1000000000
+        "exp": 9999999999_i64,
+        "iat": 1000000000_i64
     })
 }
 

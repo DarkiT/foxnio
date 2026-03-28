@@ -1,6 +1,10 @@
 //! 告警通道模块
 //!
 //! 支持多种告警通知通道
+//!
+//! 预留功能：告警通道（扩展功能）
+
+#![allow(dead_code)]
 
 pub mod dingtalk;
 pub mod email;
@@ -20,6 +24,7 @@ pub use slack::SlackChannel;
 pub use webhook::WebhookChannel;
 
 /// 告警通道 trait
+
 #[async_trait]
 pub trait AlertChannel: Send + Sync {
     /// 发送告警
@@ -75,6 +80,7 @@ pub fn create_channel(
 
 /// 邮件通道配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+
 pub struct EmailChannelConfig {
     /// SMTP 服务器地址
     pub smtp_host: String,
@@ -93,17 +99,16 @@ pub struct EmailChannelConfig {
     #[serde(default = "default_true")]
     pub use_tls: bool,
 }
-
 fn default_smtp_port() -> u16 {
     587
 }
-
 fn default_true() -> bool {
     true
 }
 
 /// Webhook 通道配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+
 pub struct WebhookChannelConfig {
     /// Webhook URL
     pub url: String,
@@ -117,11 +122,9 @@ pub struct WebhookChannelConfig {
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
 }
-
 fn default_method() -> String {
     "POST".to_string()
 }
-
 fn default_timeout() -> u64 {
     30
 }

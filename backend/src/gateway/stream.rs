@@ -1,9 +1,14 @@
 //! 流式响应完整实现
+//!
+//! 提供流式响应解析和处理功能
+//!
+//! 注意：部分功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use anyhow::Result;
 use bytes::Bytes;
-use futures::{Stream, StreamExt};
-use serde_json::Value;
+use futures::Stream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
@@ -56,26 +61,23 @@ impl SseEvent {
             Some(event)
         }
     }
+}
 
-    /// 转换为 SSE 文本
-    pub fn to_string(&self) -> String {
-        let mut result = String::new();
-
+impl std::fmt::Display for SseEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref event_type) = self.event_type {
-            result.push_str(&format!("event: {}\n", event_type));
+            writeln!(f, "event: {}", event_type)?;
         }
 
         if let Some(ref id) = self.id {
-            result.push_str(&format!("id: {}\n", id));
+            writeln!(f, "id: {}", id)?;
         }
 
         if let Some(retry) = self.retry {
-            result.push_str(&format!("retry: {}\n", retry));
+            writeln!(f, "retry: {}", retry)?;
         }
 
-        result.push_str(&format!("data: {}\n\n", self.data));
-
-        result
+        write!(f, "data: {}\n\n", self.data)
     }
 }
 
@@ -225,7 +227,7 @@ impl UsageTracker {
     }
 
     /// 从 OpenAI 流中提取使用量
-    pub fn track_openai_chunk(&mut self, chunk: &OpenAIStreamChunk) {
+    pub fn track_openai_chunk(&mut self, _chunk: &OpenAIStreamChunk) {
         // OpenAI 流式响应通常在最后一个 chunk 包含 usage
         // 这里简化处理，实际需要从 chunk 中提取
     }

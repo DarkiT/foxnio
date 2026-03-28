@@ -13,6 +13,8 @@ fn create_test_claims(role: &str) -> Claims {
         role: role.to_string(),
         exp: 0,
         iat: 0,
+        jti: None,
+        is_temp: false,
     }
 }
 

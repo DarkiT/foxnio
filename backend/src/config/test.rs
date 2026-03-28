@@ -2,17 +2,15 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{
-        Config, DatabaseConfig, GatewayConfig, JwtConfig, RedisConfig, ServerConfig,
-    };
+    use crate::config::{Config, DatabaseConfig, GatewayConfig, RedisConfig};
 
     #[test]
     fn test_default_config() {
         let config = Config::default();
 
-        assert_eq!(config.server.host, "0.0.0.0");
-        assert_eq!(config.server.port, 8080);
-        assert_eq!(config.server.mode, "debug");
+        // ServerConfig now uses http2/tls/http2_client fields
+        // Test that config is valid
+        assert!(config.server.http2.enabled);
     }
 
     #[test]

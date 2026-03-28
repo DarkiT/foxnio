@@ -2,7 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::service::scheduler::{AccountRuntimeState, SchedulingStrategy, StickySession};
+    use chrono::Utc;
 
     #[test]
     fn test_scheduling_strategy_variants() {
@@ -12,9 +13,11 @@ mod tests {
             SchedulingStrategy::PriorityFirst,
             SchedulingStrategy::Random,
             SchedulingStrategy::WeightedRoundRobin,
+            SchedulingStrategy::HealthAware,
+            SchedulingStrategy::Smart,
         ];
 
-        assert_eq!(strategies.len(), 5);
+        assert_eq!(strategies.len(), 7);
     }
 
     #[test]
@@ -26,12 +29,14 @@ mod tests {
             total_errors: 2,
             last_used: Some(Utc::now()),
             is_available: true,
+            health_score: 95.0,
         };
 
         assert_eq!(state.current_connections, 5);
         assert_eq!(state.total_requests, 100);
         assert_eq!(state.total_errors, 2);
         assert!(state.is_available);
+        assert_eq!(state.health_score, 95.0);
     }
 
     #[test]

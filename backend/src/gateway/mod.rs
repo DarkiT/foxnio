@@ -8,22 +8,21 @@ pub mod handler;
 pub mod middleware;
 pub mod models;
 pub mod proxy;
+pub mod request_rectifier;
+pub mod responses;
+pub mod responses_converter;
+pub mod responses_handler;
 pub mod routes;
 pub mod scheduler;
 pub mod stream;
+pub mod websocket;
 
-pub use claude::{get_beta_header, ClaudeHeaders, TLSFingerprint};
 pub use failover::FailoverManager;
-pub use handler::GatewayHandler;
-pub use middleware::*;
-pub use proxy::*;
+#[cfg(test)]
+pub use proxy::UpstreamEndpoints;
 pub use routes::build_app;
-pub use scheduler::{
-    AccountInfo, AccountMetrics, AccountStatus, BudgetSummary, CostConfig, CostOptimizer,
-    ScheduleContext, ScheduleResult, ScheduleStrategy, Scheduler, SchedulerConfig,
-    SchedulerMetrics, SchedulerStats,
-};
-pub use stream::*;
+#[cfg(test)]
+pub use stream::SseEvent;
 
 // 重导出统一的 AppState
-pub use crate::state::{AppState, SharedState};
+pub use crate::state::SharedState;

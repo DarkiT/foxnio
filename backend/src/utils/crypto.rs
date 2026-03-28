@@ -1,4 +1,8 @@
 //! 加密工具
+//!
+//! 注意：部分工具函数暂未使用，保留供未来扩展
+
+#![allow(dead_code)]
 
 use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
@@ -43,4 +47,35 @@ pub fn sha256(data: &[u8]) -> Vec<u8> {
     let mut hasher = Sha256::new();
     hasher.update(data);
     hasher.finalize().to_vec()
+}
+
+/// 哈希密码
+pub fn hash_password(password: &str) -> Result<String> {
+    use argon2::{
+        password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+        Argon2,
+    };
+
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let hash = argon2
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| anyhow::anyhow!("Password hashing failed: {}", e))?
+        .to_string();
+    Ok(hash)
+}
+
+/// 验证密码
+pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
+    use argon2::{
+        password_hash::{PasswordHash, PasswordVerifier},
+        Argon2,
+    };
+
+    let parsed_hash =
+        PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Invalid hash format: {}", e))?;
+    let argon2 = Argon2::default();
+    Ok(argon2
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok())
 }

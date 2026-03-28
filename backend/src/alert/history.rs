@@ -1,4 +1,8 @@
 //! 告警历史记录模块
+//!
+//! 预留功能：告警历史（扩展功能）
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

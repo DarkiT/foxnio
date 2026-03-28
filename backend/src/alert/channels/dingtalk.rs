@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use hmac::{Hmac, Mac};
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 use super::{AlertChannel, AlertSendResult, DingTalkChannelConfig};
@@ -11,21 +12,41 @@ use crate::alert::{Alert, AlertChannelType};
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// 钉钉消息格式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DingTalkMessageFormat {
+    /// Markdown 格式（默认）
+    #[default]
+    Markdown,
+    /// 纯文本格式
+    Text,
+}
+
 /// 钉钉告警通道
 pub struct DingTalkChannel {
     config: DingTalkChannelConfig,
     client: Client,
     name: String,
+    /// 消息格式
+    format: DingTalkMessageFormat,
 }
 
 impl DingTalkChannel {
+    /// 创建新的钉钉通道（使用默认 Markdown 格式）
     pub fn new(config: DingTalkChannelConfig) -> Self {
+        Self::with_format(config, DingTalkMessageFormat::default())
+    }
+
+    /// 创建指定消息格式的钉钉通道
+    pub fn with_format(config: DingTalkChannelConfig, format: DingTalkMessageFormat) -> Self {
         let name = "DingTalk".to_string();
         let client = Client::new();
         Self {
             config,
             client,
             name,
+            format,
         }
     }
 
@@ -47,7 +68,7 @@ impl DingTalkChannel {
     fn build_url(&self) -> String {
         let mut url = self.config.webhook_url.clone();
 
-        if let Some(_) = self.config.secret {
+        if self.config.secret.is_some() {
             let timestamp = chrono::Utc::now().timestamp_millis();
             if let Some(sign) = self.generate_sign(timestamp) {
                 let separator = if url.contains('?') { "&" } else { "?" };
@@ -101,11 +122,11 @@ impl DingTalkChannel {
         })
     }
 
-    /// 构建文本消息
-    fn build_text_message(&self, alert: &Alert) -> serde_json::Value {
+    /// 构建文本消息（备选格式）
+    pub fn build_text_message(&self, alert: &Alert) -> serde_json::Value {
         let content = alert.to_detailed();
 
-        let mut at_mobiles = self.config.at_mobiles.clone();
+        let at_mobiles = self.config.at_mobiles.clone();
         let mut text = content;
 
         if self.config.at_all {
@@ -133,7 +154,10 @@ impl DingTalkChannel {
 impl AlertChannel for DingTalkChannel {
     async fn send(&self, alert: &Alert) -> AlertSendResult {
         let url = self.build_url();
-        let body = self.build_markdown_message(alert);
+        let body = match self.format {
+            DingTalkMessageFormat::Markdown => self.build_markdown_message(alert),
+            DingTalkMessageFormat::Text => self.build_text_message(alert),
+        };
 
         match self.client.post(&url).json(&body).send().await {
             Ok(response) => match response.json::<DingTalkResponse>().await {

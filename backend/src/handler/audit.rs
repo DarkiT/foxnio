@@ -96,7 +96,7 @@ pub async fn list_audit_logs(
     // 脱敏处理
     let sanitized: Vec<SanitizedAuditLog> = logs.into_iter().map(|l| l.sanitized()).collect();
 
-    let total_pages = (total + page_size - 1) / page_size;
+    let total_pages = total.div_ceil(page_size);
 
     Ok(Json(AuditLogListResponse {
         object: "list".to_string(),
@@ -150,7 +150,7 @@ pub async fn list_user_audit_logs(
     // 脱敏处理
     let sanitized: Vec<SanitizedAuditLog> = logs.into_iter().map(|l| l.sanitized()).collect();
 
-    let total_pages = (total + page_size - 1) / page_size;
+    let total_pages = total.div_ceil(page_size);
 
     Ok(Json(AuditLogListResponse {
         object: "list".to_string(),
@@ -189,7 +189,7 @@ pub async fn list_sensitive_audit_logs(
     let sanitized: Vec<SanitizedAuditLog> = logs.into_iter().map(|l| l.sanitized()).collect();
 
     let total = sanitized.len() as u64;
-    let total_pages = (total + page_size - 1) / page_size;
+    let total_pages = total.div_ceil(page_size);
 
     Ok(Json(AuditLogListResponse {
         object: "list".to_string(),
@@ -237,7 +237,7 @@ pub async fn list_my_audit_logs(
     // 脱敏处理
     let sanitized: Vec<SanitizedAuditLog> = logs.into_iter().map(|l| l.sanitized()).collect();
 
-    let total_pages = (total + page_size - 1) / page_size;
+    let total_pages = total.div_ceil(page_size);
 
     Ok(Json(AuditLogListResponse {
         object: "list".to_string(),

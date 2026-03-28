@@ -1,0 +1,120 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(TlsFingerprintProfile::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::Name)
+                            .string_len(100)
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(ColumnDef::new(TlsFingerprintProfile::Description).text())
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::EnableGrease)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::CipherSuites)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::Curves)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::PointFormats)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::SignatureAlgorithms)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::AlpnProtocols)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::SupportedVersions)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::KeyShareGroups)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::PskModes)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::Extensions)
+                            .json()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(TlsFingerprintProfile::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(TlsFingerprintProfile::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum TlsFingerprintProfile {
+    Table,
+    Id,
+    Name,
+    Description,
+    EnableGrease,
+    CipherSuites,
+    Curves,
+    PointFormats,
+    SignatureAlgorithms,
+    AlpnProtocols,
+    SupportedVersions,
+    KeyShareGroups,
+    PskModes,
+    Extensions,
+    CreatedAt,
+    UpdatedAt,
+}

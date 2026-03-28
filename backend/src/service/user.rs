@@ -1,4 +1,5 @@
 //! 用户服务 - 完整实现 v0.2.0
+
 //!
 //! 新增功能：
 //! - Refresh Token 支持（7 天有效期）
@@ -6,6 +7,7 @@
 //! - 安全的 Token 轮换机制
 //! - TOTP 两步验证支持
 
+#![allow(dead_code)]
 use anyhow::{bail, Result};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -14,8 +16,8 @@ use argon2::{
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -447,7 +449,7 @@ impl UserService {
                 // 加入黑名单
                 self.add_refresh_token_to_blacklist(
                     &claims.jti,
-                    chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_else(|| Utc::now()),
+                    chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or_else(Utc::now),
                 )
                 .await?;
             }
@@ -659,7 +661,7 @@ impl UserService {
     /// 将 Access Token 加入黑名单
     async fn add_token_to_blacklist(
         &self,
-        user_id: &str,
+        _user_id: &str,
         jti: &str,
         expires_at: chrono::DateTime<Utc>,
     ) -> Result<()> {
@@ -677,7 +679,7 @@ impl UserService {
     }
 
     /// 检查 Access Token 是否在黑名单中
-    pub async fn is_token_blacklisted(&self, user_id: &str, jti: &str) -> Result<bool> {
+    pub async fn is_token_blacklisted(&self, _user_id: &str, jti: &str) -> Result<bool> {
         if let Some(ref redis) = self.redis {
             let key = format!("{}:{}", TOKEN_BLACKLIST_PREFIX, jti);
             return Ok(redis.exists(&key).await.unwrap_or(false));
@@ -1104,6 +1106,100 @@ impl UserService {
         }
         Ok(())
     }
+
+    // ========================================================================
+    // 用户资料管理
+    // ========================================================================
+
+    /// 更新用户资料
+    pub async fn update_profile(
+        &self,
+        user_id: Uuid,
+        email: Option<&str>,
+        _display_name: Option<&str>,
+        _avatar_url: Option<&str>,
+    ) -> Result<Option<UserInfo>> {
+        let user = users::Entity::find_by_id(user_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+
+        let mut user: users::ActiveModel = user.into();
+
+        if let Some(e) = email {
+            // 检查邮箱是否已被使用
+            let existing = users::Entity::find()
+                .filter(users::Column::Email.eq(e))
+                .one(&self.db)
+                .await?;
+
+            if existing.is_some() {
+                bail!("Email already in use");
+            }
+            user.email = Set(e.to_string());
+        }
+
+        // 注意：users 表可能没有 display_name 和 avatar_url 字段
+        // 如果有，需要在这里更新
+
+        user.updated_at = Set(Utc::now());
+        let updated = user.update(&self.db).await?;
+
+        Ok(Some(UserInfo {
+            id: updated.id,
+            email: updated.email,
+            role: updated.role,
+            status: updated.status,
+            balance: updated.balance,
+            totp_enabled: updated.totp_enabled,
+            created_at: updated.created_at,
+        }))
+    }
+
+    /// 修改密码
+    pub async fn change_password(
+        &self,
+        user_id: Uuid,
+        current_password: &str,
+        new_password: &str,
+    ) -> Result<()> {
+        let user = users::Entity::find_by_id(user_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("User not found"))?;
+
+        // 验证当前密码
+        let parsed_hash = PasswordHash::new(&user.password_hash)
+            .map_err(|_| anyhow::anyhow!("Invalid password hash"))?;
+
+        Argon2::default()
+            .verify_password(current_password.as_bytes(), &parsed_hash)
+            .map_err(|_| anyhow::anyhow!("Current password is incorrect"))?;
+
+        // 验证新密码长度
+        if new_password.len() < 8 {
+            bail!("New password must be at least 8 characters");
+        }
+
+        // 哈希新密码
+        let salt = SaltString::generate(&mut OsRng);
+        let password_hash = Argon2::default()
+            .hash_password(new_password.as_bytes(), &salt)
+            .map_err(|e| anyhow::anyhow!("Failed to hash password: {}", e))?
+            .to_string();
+
+        // 更新密码
+        let mut user: users::ActiveModel = user.into();
+        user.password_hash = Set(password_hash);
+        user.updated_at = Set(Utc::now());
+        user.update(&self.db).await?;
+
+        // 撤销所有 refresh token（强制重新登录）
+        self.revoke_all_user_tokens(user_id, Some("Password changed".to_string()))
+            .await?;
+
+        Ok(())
+    }
 }
 
 /// TOTP 设置响应
@@ -1216,8 +1312,6 @@ mod tests {
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("temp_token"));
-        assert!(json
-            .contains("requires_totp")
-            .or_else(|| json.contains("temp_token")));
+        assert!(json.contains("requires_totp") || json.contains("temp_token"));
     }
 }

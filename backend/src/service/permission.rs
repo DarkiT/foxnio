@@ -1,7 +1,9 @@
 //! 权限服务 - 角色权限管理
+
 //!
 //! 提供灵活的角色权限系统，支持动态配置和自定义角色。
 
+#![allow(dead_code)]
 use crate::service::user::Claims;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
@@ -12,12 +14,14 @@ use tokio::sync::RwLock;
 /// 系统角色定义
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Role {
     /// 管理员 - 完全访问权限
     Admin,
     /// 经理 - 管理用户和 API Keys
     Manager,
     /// 普通用户 - 基本访问权限
+    #[default]
     User,
     /// 访客 - 只读访问
     Guest,
@@ -25,7 +29,7 @@ pub enum Role {
 
 impl Role {
     /// 从字符串解析角色
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "admin" => Some(Self::Admin),
             "manager" => Some(Self::Manager),
@@ -67,12 +71,6 @@ impl std::fmt::Display for Role {
     }
 }
 
-impl Default for Role {
-    fn default() -> Self {
-        Self::User
-    }
-}
-
 /// 权限定义
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,6 +96,14 @@ pub enum Permission {
     AccountRead,
     /// 创建/编辑账号
     AccountWrite,
+    /// 删除账号
+    AccountDelete,
+
+    // ============ 模型管理权限 ============
+    /// 查看模型配置
+    ModelRead,
+    /// 创建/编辑模型配置
+    ModelWrite,
 
     // ============ 系统管理权限 ============
     /// 系统配置
@@ -126,11 +132,19 @@ pub enum Permission {
     AnnouncementRead,
     /// 管理公告
     AnnouncementWrite,
+
+    // ============ 分组管理权限 ============
+    /// 查看分组信息
+    GroupRead,
+    /// 创建/编辑分组
+    GroupWrite,
+    /// 删除分组
+    GroupDelete,
 }
 
 impl Permission {
     /// 从字符串解析权限
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "user_read" | "userread" => Some(Self::UserRead),
             "user_write" | "userwrite" => Some(Self::UserWrite),
@@ -140,6 +154,9 @@ impl Permission {
             "api_key_delete" | "apikeydelete" => Some(Self::ApiKeyDelete),
             "account_read" | "accountread" => Some(Self::AccountRead),
             "account_write" | "accountwrite" => Some(Self::AccountWrite),
+            "account_delete" | "accountdelete" => Some(Self::AccountDelete),
+            "model_read" | "modelread" => Some(Self::ModelRead),
+            "model_write" | "modelwrite" => Some(Self::ModelWrite),
             "system_config" | "systemconfig" => Some(Self::SystemConfig),
             "audit_log_read" | "auditlogread" => Some(Self::AuditLogRead),
             "subscription_read" | "subscriptionread" => Some(Self::SubscriptionRead),
@@ -150,6 +167,9 @@ impl Permission {
             "announcement_write" | "announcementwrite" => Some(Self::AnnouncementWrite),
             "admin_read" | "adminread" => Some(Self::AdminRead),
             "admin_write" | "adminwrite" => Some(Self::AdminWrite),
+            "group_read" | "groupread" => Some(Self::GroupRead),
+            "group_write" | "groupwrite" => Some(Self::GroupWrite),
+            "group_delete" | "groupdelete" => Some(Self::GroupDelete),
             _ => None,
         }
     }
@@ -165,6 +185,9 @@ impl Permission {
             Self::ApiKeyDelete => "api_key_delete",
             Self::AccountRead => "account_read",
             Self::AccountWrite => "account_write",
+            Self::AccountDelete => "account_delete",
+            Self::ModelRead => "model_read",
+            Self::ModelWrite => "model_write",
             Self::SystemConfig => "system_config",
             Self::AuditLogRead => "audit_log_read",
             Self::SubscriptionRead => "subscription_read",
@@ -175,6 +198,9 @@ impl Permission {
             Self::AnnouncementWrite => "announcement_write",
             Self::AdminRead => "admin_read",
             Self::AdminWrite => "admin_write",
+            Self::GroupRead => "group_read",
+            Self::GroupWrite => "group_write",
+            Self::GroupDelete => "group_delete",
         }
     }
 
@@ -189,6 +215,9 @@ impl Permission {
             Self::ApiKeyDelete => "删除 API Key",
             Self::AccountRead => "查看账号信息",
             Self::AccountWrite => "创建/编辑账号",
+            Self::AccountDelete => "删除账号",
+            Self::ModelRead => "查看模型配置",
+            Self::ModelWrite => "创建/编辑模型配置",
             Self::SystemConfig => "系统配置管理",
             Self::AuditLogRead => "查看审计日志",
             Self::SubscriptionRead => "查看订阅信息",
@@ -199,6 +228,9 @@ impl Permission {
             Self::AnnouncementWrite => "管理公告",
             Self::AdminRead => "管理员读取",
             Self::AdminWrite => "管理员写入",
+            Self::GroupRead => "查看分组信息",
+            Self::GroupWrite => "创建/编辑分组",
+            Self::GroupDelete => "删除分组",
         }
     }
 
@@ -207,13 +239,15 @@ impl Permission {
         match self {
             Self::UserRead | Self::UserWrite | Self::UserDelete => PermissionGroup::User,
             Self::ApiKeyRead | Self::ApiKeyWrite | Self::ApiKeyDelete => PermissionGroup::ApiKey,
-            Self::AccountRead | Self::AccountWrite => PermissionGroup::Account,
+            Self::AccountRead | Self::AccountWrite | Self::AccountDelete => PermissionGroup::Account,
+            Self::ModelRead | Self::ModelWrite => PermissionGroup::Model,
             Self::SystemConfig => PermissionGroup::System,
             Self::AuditLogRead => PermissionGroup::Audit,
             Self::SubscriptionRead | Self::SubscriptionWrite => PermissionGroup::Subscription,
             Self::BillingRead | Self::BillingWrite => PermissionGroup::Billing,
             Self::AnnouncementRead | Self::AnnouncementWrite => PermissionGroup::Announcement,
             Self::AdminRead | Self::AdminWrite => PermissionGroup::Admin,
+            Self::GroupRead | Self::GroupWrite | Self::GroupDelete => PermissionGroup::Group,
         }
     }
 
@@ -228,6 +262,9 @@ impl Permission {
             Self::ApiKeyDelete,
             Self::AccountRead,
             Self::AccountWrite,
+            Self::AccountDelete,
+            Self::ModelRead,
+            Self::ModelWrite,
             Self::SystemConfig,
             Self::AuditLogRead,
             Self::SubscriptionRead,
@@ -238,6 +275,9 @@ impl Permission {
             Self::AnnouncementWrite,
             Self::AdminRead,
             Self::AdminWrite,
+            Self::GroupRead,
+            Self::GroupWrite,
+            Self::GroupDelete,
         ]
     }
 }
@@ -255,12 +295,14 @@ pub enum PermissionGroup {
     User,
     ApiKey,
     Account,
+    Model,
     System,
     Audit,
     Subscription,
     Billing,
     Announcement,
     Admin,
+    Group,
 }
 
 impl PermissionGroup {
@@ -269,12 +311,14 @@ impl PermissionGroup {
             Self::User => "用户管理",
             Self::ApiKey => "API Key 管理",
             Self::Account => "账号管理",
+            Self::Model => "模型管理",
             Self::System => "系统管理",
             Self::Audit => "审计日志",
             Self::Subscription => "订阅管理",
             Self::Billing => "计费管理",
             Self::Announcement => "公告管理",
             Self::Admin => "管理员权限",
+            Self::Group => "分组管理",
         }
     }
 }
@@ -310,43 +354,15 @@ pub struct PermissionService {
 impl PermissionService {
     /// 创建新的权限服务
     pub fn new() -> Self {
-        let service = Self {
-            role_permissions: Arc::new(RwLock::new(HashMap::new())),
-        };
-        service.initialize_default_permissions();
-        service
-    }
+        let permissions = Self::create_default_permissions();
 
-    /// 从配置创建权限服务
-    pub fn from_config(config: &PermissionConfig) -> Self {
-        let service = Self::new();
-
-        // 合并自定义角色配置
-        if !config.roles.is_empty() || !config.custom_roles.is_empty() {
-            tokio::spawn({
-                let role_permissions = service.role_permissions.clone();
-                let config = config.clone();
-                async move {
-                    let mut permissions = role_permissions.write().await;
-
-                    // 应用配置中的角色权限
-                    for role_config in config.roles.iter().chain(config.custom_roles.iter()) {
-                        let perms: HashSet<Permission> = role_config
-                            .permissions
-                            .iter()
-                            .filter_map(|p| Permission::from_str(p))
-                            .collect();
-                        permissions.insert(role_config.role.to_lowercase(), perms);
-                    }
-                }
-            });
+        Self {
+            role_permissions: Arc::new(RwLock::new(permissions)),
         }
-
-        service
     }
 
-    /// 初始化默认权限
-    fn initialize_default_permissions(&self) {
+    /// 创建默认权限映射
+    fn create_default_permissions() -> HashMap<String, HashSet<Permission>> {
         let mut permissions = HashMap::new();
 
         // Admin - 完全访问
@@ -366,6 +382,8 @@ impl PermissionService {
                 Permission::BillingRead,
                 Permission::AnnouncementRead,
                 Permission::AnnouncementWrite,
+                Permission::GroupRead,
+                Permission::GroupWrite,
             ]
             .into_iter()
             .collect(),
@@ -397,14 +415,26 @@ impl PermissionService {
             .collect(),
         );
 
-        // 使用 block_in_place 来初始化
-        let role_permissions = self.role_permissions.clone();
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let mut perms = role_permissions.write().await;
-                *perms = permissions;
-            });
-        });
+        permissions
+    }
+
+    /// 从配置创建权限服务
+    pub fn from_config(config: &PermissionConfig) -> Self {
+        let mut permissions = Self::create_default_permissions();
+
+        // 应用配置中的角色权限
+        for role_config in config.roles.iter().chain(config.custom_roles.iter()) {
+            let perms: HashSet<Permission> = role_config
+                .permissions
+                .iter()
+                .filter_map(|p| Permission::parse(p))
+                .collect();
+            permissions.insert(role_config.role.to_lowercase(), perms);
+        }
+
+        Self {
+            role_permissions: Arc::new(RwLock::new(permissions)),
+        }
     }
 
     /// 获取角色的所有权限
@@ -462,7 +492,7 @@ impl PermissionService {
 
     /// 检查用户角色
     pub fn check_role(claims: &Claims, required_role: Role) -> Result<()> {
-        let user_role = Role::from_str(&claims.role)
+        let user_role = Role::parse(&claims.role)
             .ok_or_else(|| anyhow::anyhow!("Invalid role: {}", claims.role))?;
 
         match (user_role, required_role) {
@@ -627,20 +657,17 @@ mod tests {
 
     #[test]
     fn test_role_from_str() {
-        assert_eq!(Role::from_str("admin"), Some(Role::Admin));
-        assert_eq!(Role::from_str("ADMIN"), Some(Role::Admin));
-        assert_eq!(Role::from_str("Manager"), Some(Role::Manager));
-        assert_eq!(Role::from_str("unknown"), None);
+        assert_eq!(Role::parse("admin"), Some(Role::Admin));
+        assert_eq!(Role::parse("ADMIN"), Some(Role::Admin));
+        assert_eq!(Role::parse("Manager"), Some(Role::Manager));
+        assert_eq!(Role::parse("unknown"), None);
     }
 
     #[test]
     fn test_permission_from_str() {
-        assert_eq!(
-            Permission::from_str("user_read"),
-            Some(Permission::UserRead)
-        );
-        assert_eq!(Permission::from_str("UserRead"), Some(Permission::UserRead));
-        assert_eq!(Permission::from_str("unknown"), None);
+        assert_eq!(Permission::parse("user_read"), Some(Permission::UserRead));
+        assert_eq!(Permission::parse("UserRead"), Some(Permission::UserRead));
+        assert_eq!(Permission::parse("unknown"), None);
     }
 
     #[test]
@@ -651,6 +678,8 @@ mod tests {
             role: "admin".to_string(),
             exp: 0,
             iat: 0,
+            jti: None,
+            is_temp: false,
         };
 
         let user_claims = Claims {
@@ -659,6 +688,8 @@ mod tests {
             role: "user".to_string(),
             exp: 0,
             iat: 0,
+            jti: None,
+            is_temp: false,
         };
 
         assert!(PermissionService::check_role(&admin_claims, Role::User).is_ok());

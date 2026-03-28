@@ -2,6 +2,8 @@
 //!
 //! 订阅配额分发管理平台
 
+#![allow(dead_code)]
+
 pub mod alert;
 pub mod cache;
 pub mod config;
@@ -25,3 +27,6 @@ pub use config::{
     ClientAuthMode, Http2ClientConfig, Http2Config, ServerConfig, TlsConfig, TlsVersion,
 };
 pub use server::{build_tls_server_config, load_certs, load_private_key, TlsError};
+
+// Re-export billing service as public API
+pub use service::billing::{BillingService, RecordUsageParams, UsageRecord};

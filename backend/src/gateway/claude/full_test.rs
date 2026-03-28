@@ -70,10 +70,10 @@ mod tests {
         });
         assert!(validator.has_claude_code_system_prompt(&body));
 
-        // 不匹配
+        // 不匹配 - 使用完全不同的内容
         let body = serde_json::json!({
             "system": [
-                {"type": "text", "text": "You are a helpful assistant."}
+                {"type": "text", "text": "Hello world, this is a test message."}
             ]
         });
         assert!(!validator.has_claude_code_system_prompt(&body));
@@ -351,15 +351,15 @@ mod tests {
         let ordered_headers = headers.build_ordered(auth_token, &beta);
 
         // 验证关键 headers
-        let auth = ordered_headers.iter().find(|(k, _)| k == "authorization");
+        let auth = ordered_headers.iter().find(|(k, _)| *k == "authorization");
         assert!(auth.is_some());
         assert!(auth.unwrap().1.contains(auth_token));
 
-        let x_app = ordered_headers.iter().find(|(k, _)| k == "x-app");
+        let x_app = ordered_headers.iter().find(|(k, _)| *k == "x-app");
         assert!(x_app.is_some());
         assert_eq!(x_app.unwrap().1, "cli");
 
-        let anthropic_beta = ordered_headers.iter().find(|(k, _)| k == "anthropic-beta");
+        let anthropic_beta = ordered_headers.iter().find(|(k, _)| *k == "anthropic-beta");
         assert!(anthropic_beta.is_some());
         assert_eq!(anthropic_beta.unwrap().1, beta);
     }

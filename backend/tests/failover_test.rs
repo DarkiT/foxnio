@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::gateway::failover::{AccountHealth, FailoverConfig, FailoverManager};
+    use foxnio::gateway::failover::{FailoverConfig, FailoverManager};
 
     #[tokio::test]
     async fn test_failover_manager_creation() {
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_backoff_calculation() {
-        let config = FailoverConfig {
+        let _config = FailoverConfig {
             max_retries: 5,
             retry_delay_ms: 100,
             backoff_base: 2.0,

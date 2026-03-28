@@ -2,6 +2,7 @@
 //!
 //! 存储 JWT refresh token 的哈希值，支持安全的 token 轮换和撤销
 
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};

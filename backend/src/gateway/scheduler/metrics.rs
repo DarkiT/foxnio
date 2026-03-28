@@ -1,12 +1,16 @@
 //! 调度器指标收集模块
 //!
 //! 提供实时指标收集、聚合和查询功能
+//!
+//! 预留功能：调度器指标（扩展功能）
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 

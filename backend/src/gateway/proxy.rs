@@ -2,16 +2,14 @@
 //!
 //! 支持 HTTP/2 和 HTTP/1.1 自动协商
 
+#![allow(dead_code)]
 use anyhow::Result;
 use axum::{
     body::Body,
-    http::{HeaderMap, HeaderValue, Method, Request, StatusCode, Uri},
-    response::{IntoResponse, Response},
+    http::{HeaderValue, Method, Request},
+    response::Response,
 };
-use hyper::body::Incoming;
 use reqwest::Client;
-use std::sync::Arc;
-use std::time::Duration;
 
 use crate::config::Http2ClientConfig;
 use crate::gateway::SharedState;
@@ -71,7 +69,7 @@ impl ProxyClient {
     /// 转发请求到上游
     pub async fn proxy_request(
         &self,
-        state: &SharedState,
+        _state: &SharedState,
         upstream_url: &str,
         request: Request<Body>,
         api_key: Option<&str>,

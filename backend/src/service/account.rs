@@ -1,12 +1,12 @@
 //! 上游账号服务 - 完整实现
 
+#![allow(dead_code)]
 use anyhow::Result;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter,
+    QueryOrder, Set,
 };
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::entity::accounts;
@@ -57,6 +57,7 @@ impl AccountService {
             priority: Set(priority),
             concurrent_limit: Set(Some(5)),
             rate_limit_rpm: Set(Some(60)),
+            group_id: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -164,5 +165,76 @@ impl AccountService {
             .await?;
 
         Ok(account)
+    }
+
+    /// 刷新账号 Token
+    pub async fn refresh_token(&self, _account_id: Uuid) -> Result<bool> {
+        // TODO: 实现具体的 Token 刷新逻辑
+        // 需要根据 provider 调用相应的 API
+        Ok(true)
+    }
+
+    /// 恢复账号状态
+    pub async fn recover_state(&self, account_id: Uuid) -> Result<bool> {
+        let account = accounts::Entity::find_by_id(account_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Account not found"))?;
+
+        let mut account: accounts::ActiveModel = account.into();
+        account.status = Set("active".to_string());
+        account.last_error = Set(None);
+        account.updated_at = Set(Utc::now());
+        account.update(&self.db).await?;
+
+        Ok(true)
+    }
+
+    /// 刷新账号 Tier
+    pub async fn refresh_tier(&self, _account_id: Uuid) -> Result<String> {
+        // TODO: 实现具体的 Tier 刷新逻辑
+        // 需要根据 provider 调用相应的 API
+        Ok("tier1".to_string())
+    }
+
+    /// 清除账号错误
+    pub async fn clear_error(&self, account_id: Uuid) -> Result<()> {
+        let account = accounts::Entity::find_by_id(account_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Account not found"))?;
+
+        let mut account: accounts::ActiveModel = account.into();
+        account.last_error = Set(None);
+        account.updated_at = Set(Utc::now());
+        account.update(&self.db).await?;
+
+        Ok(())
+    }
+
+    /// 获取账号使用统计
+    pub async fn get_usage_stats(&self, _account_id: Uuid) -> Result<serde_json::Value> {
+        // TODO: 实现使用统计查询
+        Ok(serde_json::json!({
+            "total_requests": 0,
+            "total_tokens": 0,
+            "total_cost": 0.0,
+        }))
+    }
+
+    /// 获取账号今日统计
+    pub async fn get_today_stats(&self, _account_id: Uuid) -> Result<serde_json::Value> {
+        // TODO: 实现今日统计查询
+        Ok(serde_json::json!({
+            "requests": 0,
+            "tokens": 0,
+            "cost": 0.0,
+        }))
+    }
+
+    /// 重置账号配额
+    pub async fn reset_quota(&self, _account_id: Uuid) -> Result<()> {
+        // TODO: 实现配额重置
+        Ok(())
     }
 }

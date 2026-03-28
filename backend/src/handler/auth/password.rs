@@ -161,7 +161,6 @@ pub async fn reset_password(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_reset_request_validation() {

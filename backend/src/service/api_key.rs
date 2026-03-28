@@ -1,11 +1,12 @@
 //! API Key 服务 - 完整实现
 
+#![allow(dead_code)]
 use anyhow::Result;
 use chrono::Utc;
 use rand::Rng;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use uuid::Uuid;
 
@@ -49,7 +50,7 @@ impl ApiKeyService {
     /// 为用户创建 API Key
     pub async fn create(&self, user_id: Uuid, name: Option<String>) -> Result<ApiKeyInfo> {
         // 验证用户存在
-        let user = users::Entity::find_by_id(user_id)
+        let _user = users::Entity::find_by_id(user_id)
             .one(&self.db)
             .await?
             .ok_or_else(|| anyhow::anyhow!("User not found"))?;
@@ -162,7 +163,8 @@ impl ApiKeyService {
     }
 }
 
-fn mask_key(key: &str) -> String {
+/// 掩码 API Key，只显示前 7 位和后 4 位
+pub fn mask_key(key: &str) -> String {
     if key.len() < 12 {
         return key.to_string();
     }

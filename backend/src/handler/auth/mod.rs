@@ -6,11 +6,13 @@
 //! - 密码重置
 //! - TOTP 两步验证
 
+#![allow(dead_code)]
 pub mod password;
 pub mod refresh;
 pub mod totp;
 
 // 重新导出刷新相关函数
+#[allow(unused_imports)]
 pub use refresh::{logout, logout_all, refresh};
 
 // 重新导出 TOTP 相关函数
@@ -156,8 +158,8 @@ pub async fn register(
         ));
     }
 
-    let user_agent = extract_user_agent(&headers);
-    let ip_address = extract_ip_address(&headers);
+    let _user_agent = extract_user_agent(&headers);
+    let _ip_address = extract_ip_address(&headers);
 
     let user_service = UserService::with_redis(
         state.db.clone(),
@@ -247,7 +249,7 @@ pub async fn login(
         })),
         crate::service::user::LoginResponse::RequiresTotp {
             temp_token,
-            expires_in,
+            expires_in: _,
             message,
         } => Ok(Json(AuthResponse {
             access_token: None,

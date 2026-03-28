@@ -4,6 +4,7 @@
 //! - POST /auth/refresh - 使用 refresh token 刷新 access token
 //! - POST /auth/logout - 登出并撤销 token
 
+#![allow(dead_code)]
 use axum::{
     http::{HeaderMap, StatusCode},
     Extension, Json,
@@ -11,7 +12,6 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::db::RedisPool;
 use crate::gateway::SharedState;
 use crate::service::user::UserService;
 
@@ -106,13 +106,7 @@ fn extract_access_token(headers: &HeaderMap) -> Option<String> {
     headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
-        .and_then(|s| {
-            if s.starts_with("Bearer ") {
-                Some(s[7..].to_string())
-            } else {
-                None
-            }
-        })
+        .and_then(|s| s.strip_prefix("Bearer ").map(|s| s.to_string()))
 }
 
 /// POST /auth/refresh - 刷新 Access Token

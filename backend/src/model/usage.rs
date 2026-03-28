@@ -1,5 +1,6 @@
 //! 用量记录模型
 
+#![allow(dead_code)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

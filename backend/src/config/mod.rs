@@ -1,4 +1,8 @@
 //! 配置管理
+//!
+//! 注意：部分配置选项正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -15,19 +19,15 @@ mod test;
 /// 压缩级别
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum CompressionLevelConfig {
     /// 快速压缩
     Fast,
     /// 默认压缩
+    #[default]
     Default,
     /// 最佳压缩
     Best,
-}
-
-impl Default for CompressionLevelConfig {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl From<CompressionLevelConfig> for crate::gateway::middleware::compression::CompressionLevel {
@@ -96,17 +96,13 @@ impl Default for CompressionConfig {
 /// TLS 版本
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TlsVersion {
     /// TLS 1.2
     V12,
     /// TLS 1.3 (推荐)
+    #[default]
     V13,
-}
-
-impl Default for TlsVersion {
-    fn default() -> Self {
-        Self::V13
-    }
 }
 
 /// 客户端认证模式

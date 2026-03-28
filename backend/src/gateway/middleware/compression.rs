@@ -6,6 +6,10 @@
 //! - 流式压缩支持
 //! - 请求解压缩
 //! - 压缩统计
+//!
+//! 注意：部分统计和扩展功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use axum::{
     body::Body,
@@ -16,35 +20,25 @@ use axum::{
     middleware::Next,
 };
 use brotli::{CompressorReader, Decompressor};
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression as GzCompression};
-use futures::stream::{Stream, StreamExt};
-use pin_project_lite::pin_project;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::{
     io::{Read, Write},
     sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
-use tokio::sync::RwLock;
 
 /// 压缩级别
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CompressionLevel {
     /// 快速压缩 - 低 CPU 使用率，较低压缩率
     Fast,
     /// 默认压缩 - 平衡 CPU 和压缩率
+    #[default]
     Default,
     /// 最佳压缩 - 高 CPU 使用率，最高压缩率
     Best,
-}
-
-impl Default for CompressionLevel {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl From<CompressionLevel> for GzCompression {
@@ -69,20 +63,15 @@ impl From<CompressionLevel> for u32 {
 }
 
 /// 内容编码类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum ContentEncoding {
     /// 无压缩
+    #[default]
     Identity,
     /// Gzip 压缩
     Gzip,
     /// Brotli 压缩
     Brotli,
-}
-
-impl Default for ContentEncoding {
-    fn default() -> Self {
-        Self::Identity
-    }
 }
 
 impl std::fmt::Display for ContentEncoding {
@@ -224,9 +213,14 @@ impl CompressionLayer {
                 ContentEncoding::Identity => true,
             };
 
-            if can_use && quality > best_quality {
-                best_quality = quality;
-                best_encoding = encoding;
+            // 当质量相同时，优先选择 brotli
+            if can_use {
+                let should_select =
+                    quality > best_quality || (quality == best_quality && encoding > best_encoding);
+                if should_select {
+                    best_quality = quality;
+                    best_encoding = encoding;
+                }
             }
         }
 
@@ -641,7 +635,7 @@ pub async fn compression_middleware(req: Request<Body>, next: Next) -> Response<
     let encoding = compression_layer.select_encoding(accept_encoding);
 
     // 执行请求
-    let mut response = next.run(req).await;
+    let response = next.run(req).await;
 
     // 检查是否需要压缩响应
     if encoding == ContentEncoding::Identity || !should_compress(response.headers()) {
@@ -657,7 +651,7 @@ pub async fn compression_middleware(req: Request<Body>, next: Next) -> Response<
 
     // 检查大小
     if body_bytes.len() < compression_layer.min_size {
-        let mut builder = Response::from_parts(parts, Body::from(body_bytes));
+        let builder = Response::from_parts(parts, Body::from(body_bytes));
         return builder;
     }
 
@@ -749,6 +743,7 @@ pub async fn decompression_middleware(req: Request<Body>, next: Next) -> Respons
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_compression_level_default() {
@@ -790,7 +785,7 @@ mod tests {
 
     #[test]
     fn test_compress_gzip() {
-        let layer = CompressionLayer::new().brotli(false);
+        let layer = CompressionLayer::new().brotli(false).min_size(100);
 
         let data = b"Hello, World! This is a test string that should compress well. ".repeat(10);
 
@@ -803,7 +798,7 @@ mod tests {
 
     #[test]
     fn test_compress_brotli() {
-        let layer = CompressionLayer::new().gzip(false);
+        let layer = CompressionLayer::new().gzip(false).min_size(100);
 
         let data = b"Hello, World! This is a test string that should compress well. ".repeat(10);
 
@@ -829,10 +824,13 @@ mod tests {
 
     #[test]
     fn test_decompress_gzip() {
-        let layer = CompressionLayer::new();
+        let layer = CompressionLayer::new().min_size(10);
 
-        let original = b"Hello, World! This is a test string.";
+        let original = b"Hello, World! This is a test string that is long enough.";
         let compressed = layer.compress(original, ContentEncoding::Gzip).unwrap();
+
+        // 确保数据被压缩了
+        assert_eq!(compressed.encoding, ContentEncoding::Gzip);
 
         let decompressed = layer
             .decompress(&compressed.body, ContentEncoding::Gzip)
@@ -843,10 +841,13 @@ mod tests {
 
     #[test]
     fn test_decompress_brotli() {
-        let layer = CompressionLayer::new();
+        let layer = CompressionLayer::new().min_size(10);
 
-        let original = b"Hello, World! This is a test string.";
+        let original = b"Hello, World! This is a test string that is long enough.";
         let compressed = layer.compress(original, ContentEncoding::Brotli).unwrap();
+
+        // 确保数据被压缩了
+        assert_eq!(compressed.encoding, ContentEncoding::Brotli);
 
         let decompressed = layer
             .decompress(&compressed.body, ContentEncoding::Brotli)
@@ -857,10 +858,10 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let layer = CompressionLayer::new();
+        let layer = CompressionLayer::new().min_size(50);
 
-        // 压缩一些数据
-        let data = b"Test data for compression statistics";
+        // 压缩一些数据 - 确保足够长以触发压缩
+        let data = b"Test data for compression statistics that is long enough to trigger compression. We need more data here.";
         layer.compress(data, ContentEncoding::Gzip).unwrap();
         layer.compress(data, ContentEncoding::Brotli).unwrap();
 
@@ -873,7 +874,7 @@ mod tests {
 
     #[test]
     fn test_compression_ratio() {
-        let layer = CompressionLayer::new();
+        let layer = CompressionLayer::new().min_size(100);
 
         // 重复数据压缩率高
         let data = b"a".repeat(1000);

@@ -1,4 +1,8 @@
 //! 监控指标收集
+//!
+//! 注意：部分功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;

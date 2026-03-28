@@ -1,5 +1,6 @@
 //! 遥测拦截中间件
 
+#![allow(dead_code)]
 use axum::{
     body::Body,
     http::{Request, Response, StatusCode, Uri},

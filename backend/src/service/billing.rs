@@ -1,16 +1,25 @@
 //! 计费服务 - 完整实现
 
+#![allow(dead_code)]
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set,
-};
-use serde_json::json;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
 use super::user::UserService;
 use crate::entity::usages;
+
+/// 使用记录参数
+#[derive(Debug, Clone)]
+pub struct RecordUsageParams {
+    pub user_id: Uuid,
+    pub api_key_id: Uuid,
+    pub model: String,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct UsageRecord {
@@ -46,32 +55,21 @@ impl BillingService {
     }
 
     /// 记录用量
-    pub async fn record_usage(
-        &self,
-        user_id: Uuid,
-        api_key_id: Uuid,
-        account_id: Option<Uuid>,
-        model: &str,
-        input_tokens: i64,
-        output_tokens: i64,
-        request_id: Option<String>,
-        success: bool,
-        error_message: Option<String>,
-    ) -> Result<UsageRecord> {
-        let cost = self.calculate_cost(model, input_tokens, output_tokens);
+    pub async fn record_usage(&self, params: RecordUsageParams) -> Result<UsageRecord> {
+        let cost = self.calculate_cost(&params.model, params.input_tokens, params.output_tokens);
 
         let usage = usages::ActiveModel {
             id: Set(Uuid::new_v4()),
-            user_id: Set(user_id),
-            api_key_id: Set(api_key_id),
-            account_id: Set(account_id),
-            model: Set(model.to_string()),
-            input_tokens: Set(input_tokens),
-            output_tokens: Set(output_tokens),
+            user_id: Set(params.user_id),
+            api_key_id: Set(params.api_key_id),
+            account_id: Set(None),
+            model: Set(params.model),
+            input_tokens: Set(params.input_tokens),
+            output_tokens: Set(params.output_tokens),
             cost: Set(cost),
-            request_id: Set(request_id),
-            success: Set(success),
-            error_message: Set(error_message),
+            request_id: Set(None),
+            success: Set(params.success),
+            error_message: Set(params.error_message),
             metadata: Set(None),
             created_at: Set(Utc::now()),
         };
@@ -81,7 +79,7 @@ impl BillingService {
         // 扣减余额
         if cost > 0 {
             let user_service = UserService::new(self.db.clone(), String::new(), 24);
-            user_service.update_balance(user_id, -cost).await?;
+            user_service.update_balance(params.user_id, -cost).await?;
         }
 
         Ok(UsageRecord {
@@ -98,6 +96,16 @@ impl BillingService {
 
     /// 计算费用（单位：分）
     pub fn calculate_cost(&self, model: &str, input_tokens: i64, output_tokens: i64) -> i64 {
+        Self::calculate_cost_static(model, input_tokens, output_tokens, self.rate_multiplier)
+    }
+
+    /// 计算费用（静态方法，用于测试）
+    pub fn calculate_cost_static(
+        model: &str,
+        input_tokens: i64,
+        output_tokens: i64,
+        rate_multiplier: f64,
+    ) -> i64 {
         // 模型定价（每 1K tokens，单位：分）
         let (input_rate, output_rate) = match model {
             // Claude 3
@@ -127,9 +135,9 @@ impl BillingService {
         };
 
         let input_cost =
-            (input_tokens as f64 / 1000.0 * input_rate as f64 * self.rate_multiplier) as i64;
+            (input_tokens as f64 / 1000.0 * input_rate as f64 * rate_multiplier) as i64;
         let output_cost =
-            (output_tokens as f64 / 1000.0 * output_rate as f64 * self.rate_multiplier) as i64;
+            (output_tokens as f64 / 1000.0 * output_rate as f64 * rate_multiplier) as i64;
 
         input_cost + output_cost
     }
@@ -155,38 +163,6 @@ impl BillingService {
             total_output_tokens,
             total_cost,
         })
-    }
-
-    /// 获取用户用量列表
-    pub async fn get_user_usages(
-        &self,
-        user_id: Uuid,
-        days: i32,
-        limit: u64,
-    ) -> Result<Vec<UsageRecord>> {
-        let start_time = Utc::now() - chrono::Duration::days(days as i64);
-
-        let usages = usages::Entity::find()
-            .filter(usages::Column::UserId.eq(user_id))
-            .filter(usages::Column::CreatedAt.gte(start_time))
-            .order_by_desc(usages::Column::CreatedAt)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
-
-        Ok(usages
-            .into_iter()
-            .map(|u| UsageRecord {
-                id: u.id,
-                user_id: u.user_id,
-                model: u.model,
-                input_tokens: u.input_tokens,
-                output_tokens: u.output_tokens,
-                cost: u.cost,
-                success: u.success,
-                created_at: u.created_at,
-            })
-            .collect())
     }
 
     /// 获取全局统计（管理后台）

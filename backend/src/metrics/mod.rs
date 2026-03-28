@@ -1,13 +1,15 @@
 //! 监控指标模块 - Prometheus 兼容的指标收集系统
 //!
 //! 提供完整的业务指标收集、Prometheus 格式导出和性能监控功能。
+//!
+//! 注意：部分指标记录器功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 pub mod business;
 pub mod prometheus;
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 // Re-export prometheus types for convenience
@@ -15,8 +17,7 @@ pub use ::prometheus::{
     opts, register_counter, register_counter_vec, register_gauge, register_gauge_vec,
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge, register_int_gauge_vec, Counter, CounterVec, Encoder, Gauge, GaugeVec,
-    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Registry,
-    TextEncoder,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, TextEncoder,
 };
 
 // Re-export business metrics
@@ -519,7 +520,7 @@ pub fn get_metrics_summary() -> MetricsSummary {
 }
 
 /// 从 CounterVec 获取总和
-fn get_counter_sum(counter_vec: &IntCounterVec) -> u64 {
+fn get_counter_sum(_counter_vec: &IntCounterVec) -> u64 {
     // Note: This is a simplification. In production, you'd want to iterate all label combinations
     // For now, we return 0 as CounterVec doesn't have a simple sum method
     // This would need to be tracked separately if exact sum is needed

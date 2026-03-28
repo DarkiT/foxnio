@@ -6,21 +6,18 @@ use argon2::{
     Argon2,
 };
 use chrono::{Duration, Utc};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QuerySelect, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use super::email::{EmailConfig, EmailSender};
+use super::email::EmailSender;
 use crate::entity::{password_reset_tokens, users};
 
 /// Token 有效期（小时）
-const TOKEN_EXPIRY_HOURS: i64 = 1;
+pub const TOKEN_EXPIRY_HOURS: i64 = 1;
 
 /// Token 长度（字节）
-const TOKEN_LENGTH: usize = 32;
+pub const TOKEN_LENGTH: usize = 32;
 
 /// 密码重置服务
 pub struct PasswordResetService<E: EmailSender> {
@@ -236,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_generate_token() {
-        let mock_sender = MockEmailSender::new();
+        let _mock_sender = MockEmailSender::new();
         // 这里需要 mock 数据库连接，实际测试在集成测试中进行
         // 测试 token 长度：32 字节 = 64 个十六进制字符
         let expected_length = TOKEN_LENGTH * 2;
@@ -245,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_hash_token() {
-        let mock_sender = MockEmailSender::new();
+        let _mock_sender = MockEmailSender::new();
         // SHA256 输出长度：32 字节 = 64 个十六进制字符
         let expected_length = 64;
         assert_eq!(expected_length, 64);

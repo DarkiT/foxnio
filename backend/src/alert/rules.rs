@@ -1,6 +1,10 @@
 //! 告警规则引擎
 //!
 //! 定义告警规则和条件评估逻辑
+//!
+//! 预留功能：告警规则（扩展功能）
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -407,7 +411,7 @@ impl AlertRule {
     }
 
     /// 生成告警
-    pub fn generate_alert(&self, metrics: &MetricsSnapshot) -> Alert {
+    pub fn generate_alert(&self, _metrics: &MetricsSnapshot) -> Alert {
         let message = format!(
             "规则 '{}' 触发告警。条件: {}",
             self.name,

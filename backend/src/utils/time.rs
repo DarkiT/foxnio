@@ -1,4 +1,10 @@
 //! 时间工具
+//!
+//! 提供时间相关的工具函数
+//!
+//! 注意：部分工具函数暂未使用，保留供未来扩展
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, TimeZone, Utc};
 use std::time::{SystemTime, UNIX_EPOCH};

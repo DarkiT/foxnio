@@ -5,9 +5,13 @@
 //! - 连接健康检查优化
 //! - 连接复用率统计
 //! - 连接泄漏检测
+//!
+//! 注意：部分功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use anyhow::{Context, Result};
-use sea_orm::{Database, DatabaseConnection, DbErr};
+use sea_orm::{Database, DatabaseConnection};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -270,7 +274,7 @@ impl DatabasePool {
         let stats = self.stats.clone();
         let interval = self.config.health_check_interval;
         let running = Arc::new(AtomicBool::new(true));
-        let running_clone = running.clone();
+        let _running_clone = running.clone();
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
@@ -290,7 +294,7 @@ impl DatabasePool {
 
     /// 获取连接池状态（增强版）
     pub fn pool_status(&self) -> PoolStatus {
-        let size = self.sqlx.size() as u32;
+        let size = self.sqlx.size();
         let num_idle = self.sqlx.num_idle() as u32;
 
         PoolStatus {
@@ -401,9 +405,7 @@ pub struct DatabaseMigrator;
 
 impl DatabaseMigrator {
     /// 运行迁移
-    pub async fn run(db: &DatabaseConnection) -> Result<()> {
-        use sea_orm_migration::MigratorTrait;
-
+    pub async fn run(_db: &DatabaseConnection) -> Result<()> {
         info!("Running database migrations...");
 
         // TODO: 实现实际的迁移
@@ -414,7 +416,7 @@ impl DatabaseMigrator {
     }
 
     /// 回滚迁移
-    pub async fn rollback(db: &DatabaseConnection) -> Result<()> {
+    pub async fn rollback(_db: &DatabaseConnection) -> Result<()> {
         info!("Rolling back database migrations...");
 
         // TODO: 实现实际的回滚

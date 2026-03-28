@@ -5,7 +5,6 @@
 
 use chrono::{DateTime, Utc};
 use lru::LruCache;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -446,22 +445,24 @@ mod tests {
     fn test_thread_safety() {
         let cache: Cache<String, i32> = Cache::new(100);
         let cache_clone = cache.clone();
+        let cache_clone2 = cache.clone();
 
         let handle1 = thread::spawn(move || {
             for i in 0..50 {
-                cache.put(format!("key{}", i), i);
+                cache_clone.put(format!("key{}", i), i);
             }
         });
 
         let handle2 = thread::spawn(move || {
             for i in 50..100 {
-                cache_clone.put(format!("key{}", i), i);
+                cache_clone2.put(format!("key{}", i), i);
             }
         });
 
         handle1.join().unwrap();
         handle2.join().unwrap();
 
+        // Use a new clone to check since the original was moved
         assert_eq!(cache.len(), 100);
     }
 

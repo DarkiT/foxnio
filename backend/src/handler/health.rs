@@ -6,18 +6,18 @@
 //! - GET /health/ready - 就绪探针
 //! - GET /health/detailed - 详细状态
 
+#![allow(dead_code)]
 use axum::{extract::State, http::StatusCode, Json};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::gateway::SharedState;
 use crate::health::{AggregateHealthStatus, HealthChecker};
 
 /// 简单健康状态
 pub async fn health_simple(State(checker): State<Arc<HealthChecker>>) -> Json<serde_json::Value> {
     let status = checker.check_critical().await;
 
-    let (status_str, code) = if status.healthy {
+    let (status_str, _code) = if status.healthy {
         ("healthy", StatusCode::OK)
     } else {
         ("unhealthy", StatusCode::SERVICE_UNAVAILABLE)

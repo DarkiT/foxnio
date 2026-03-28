@@ -2,10 +2,6 @@
 //!
 //! 测试审计日志的记录、查询和过滤功能
 
-use chrono::{Duration, Utc};
-use serde_json::json;
-use uuid::Uuid;
-
 // 由于无法直接访问数据库，这里使用单元测试风格的模拟测试
 
 #[cfg(test)]
@@ -16,40 +12,40 @@ mod audit_entity_tests {
     fn test_audit_action_from_str() {
         // 测试所有预定义的审计动作
         assert_eq!(
-            AuditAction::from_str("USER_LOGIN"),
+            AuditAction::parse("USER_LOGIN"),
             Some(AuditAction::UserLogin)
         );
         assert_eq!(
-            AuditAction::from_str("USER_LOGOUT"),
+            AuditAction::parse("USER_LOGOUT"),
             Some(AuditAction::UserLogout)
         );
         assert_eq!(
-            AuditAction::from_str("USER_REGISTER"),
+            AuditAction::parse("USER_REGISTER"),
             Some(AuditAction::UserRegister)
         );
         assert_eq!(
-            AuditAction::from_str("PASSWORD_CHANGE"),
+            AuditAction::parse("PASSWORD_CHANGE"),
             Some(AuditAction::PasswordChange)
         );
         assert_eq!(
-            AuditAction::from_str("API_KEY_CREATE"),
+            AuditAction::parse("API_KEY_CREATE"),
             Some(AuditAction::ApiKeyCreate)
         );
         assert_eq!(
-            AuditAction::from_str("API_KEY_DELETE"),
+            AuditAction::parse("API_KEY_DELETE"),
             Some(AuditAction::ApiKeyDelete)
         );
         assert_eq!(
-            AuditAction::from_str("ACCOUNT_UPDATE"),
+            AuditAction::parse("ACCOUNT_UPDATE"),
             Some(AuditAction::AccountUpdate)
         );
         assert_eq!(
-            AuditAction::from_str("ADMIN_ACTION"),
+            AuditAction::parse("ADMIN_ACTION"),
             Some(AuditAction::AdminAction)
         );
 
         // 测试无效的动作
-        assert_eq!(AuditAction::from_str("INVALID"), None);
+        assert_eq!(AuditAction::parse("INVALID"), None);
     }
 
     #[test]
@@ -102,8 +98,9 @@ mod audit_entity_tests {
 
 #[cfg(test)]
 mod audit_service_tests {
-    use foxnio::entity::audit_logs::AuditAction;
     use foxnio::service::{AuditEntry, AuditFilter};
+    use serde_json::json;
+    use uuid::Uuid;
 
     #[test]
     fn test_audit_entry_user_login() {
@@ -206,7 +203,7 @@ mod audit_service_tests {
 
 #[cfg(test)]
 mod audit_middleware_tests {
-    use foxnio::gateway::middleware::AuditConfig;
+    use foxnio::gateway::middleware::audit::AuditConfig;
 
     #[test]
     fn test_audit_config_default() {
@@ -222,11 +219,14 @@ mod audit_middleware_tests {
         assert!(config.excluded_paths.contains(&"/metrics".to_string()));
 
         // 检查敏感路径
-        assert!(config.sensitive_paths.iter().any(|p| p.contains("login")));
         assert!(config
             .sensitive_paths
             .iter()
-            .any(|p| p.contains("password")));
+            .any(|p: &String| p.contains("login")));
+        assert!(config
+            .sensitive_paths
+            .iter()
+            .any(|p: &String| p.contains("password")));
     }
 
     #[test]

@@ -7,6 +7,7 @@
 //! - 批量操作支持
 //! - 本地内存缓存（LRU）
 
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use lru::LruCache;
 use redis::{aio::ConnectionManager, AsyncCommands, Client};
@@ -15,7 +16,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 /// Redis 配置
 #[derive(Debug, Clone)]

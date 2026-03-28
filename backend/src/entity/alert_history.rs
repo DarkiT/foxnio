@@ -43,7 +43,7 @@ impl ActiveModelBehavior for ActiveModel {}
 impl Model {
     /// 获取告警级别
     pub fn get_level(&self) -> Option<crate::alert::AlertLevel> {
-        crate::alert::AlertLevel::from_str(&self.level)
+        crate::alert::AlertLevel::parse(&self.level)
     }
 
     /// 格式化为摘要

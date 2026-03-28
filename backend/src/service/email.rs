@@ -1,6 +1,7 @@
 //! 邮件发送服务
 
-use anyhow::{bail, Result};
+#![allow(dead_code)]
+use anyhow::Result;
 use chrono::Datelike;
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
@@ -8,7 +9,6 @@ use lettre::{
     Message, SmtpTransport, Transport,
 };
 use serde::Deserialize;
-use std::sync::Arc;
 
 /// 邮件配置
 #[derive(Debug, Clone, Deserialize)]

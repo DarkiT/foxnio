@@ -27,6 +27,6 @@ impl ActiveModelBehavior for ActiveModel {}
 impl Model {
     /// 获取通道类型
     pub fn get_channel_type(&self) -> Option<crate::alert::AlertChannelType> {
-        crate::alert::AlertChannelType::from_str(&self.channel_type)
+        crate::alert::AlertChannelType::parse(&self.channel_type)
     }
 }

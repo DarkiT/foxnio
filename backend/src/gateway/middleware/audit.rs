@@ -1,17 +1,14 @@
 //! 审计中间件 - Audit Middleware
 //!
 //! 自动记录 API 请求和敏感操作的审计日志
+//!
+//! 注意：部分功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use axum::{
-    body::{Body, Bytes},
-    extract::State,
-    http::{Request, StatusCode, Uri},
-    middleware::Next,
-    response::{IntoResponse, Response},
-    Extension,
+    body::Body, extract::State, http::Request, middleware::Next, response::Response, Extension,
 };
-use serde_json::json;
-use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -112,7 +109,7 @@ pub async fn audit_middleware(
 
     // 记录审计日志
     let status = response.status().as_u16();
-    let elapsed = start.elapsed();
+    let _elapsed = start.elapsed();
 
     // 确定审计动作
     let action = determine_action(&method, &path);

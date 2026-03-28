@@ -2,11 +2,12 @@
 //!
 //! 提供统一的模型定义、配置管理和路由功能
 
+#![allow(dead_code)]
 mod config;
 
 pub use config::{
     get_model_config, get_model_info, list_all_models, list_models_by_provider, ModelConfig,
-    ModelInfo, ProviderConfig, MODEL_CONFIGS,
+    ModelInfo, ProviderConfig,
 };
 
 use serde::{Deserialize, Serialize};

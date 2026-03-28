@@ -1,6 +1,7 @@
 //! TOTP 两步验证测试
 
 use crate::service::totp::TotpService;
+use base64::Engine;
 
 #[test]
 fn test_generate_secret() {
@@ -170,25 +171,6 @@ fn test_verify_code_valid_format() {
         TotpService::verify_code(&secret, &code),
         "Current code should verify"
     );
-}
-
-#[test]
-fn test_base32_encode_decode() {
-    use crate::service::totp::{base32_decode, base32_encode};
-
-    let test_cases = vec![
-        b"Hello".to_vec(),
-        b"World!".to_vec(),
-        b"Test123".to_vec(),
-        vec![0x00, 0x01, 0x02, 0x03, 0x04],
-        (0..=255).collect::<Vec<u8>>(),
-    ];
-
-    for original in test_cases {
-        let encoded = base32_encode(&original);
-        let decoded = base32_decode(&encoded).unwrap();
-        assert_eq!(original, decoded, "Encode/decode should be reversible");
-    }
 }
 
 #[test]

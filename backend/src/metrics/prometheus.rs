@@ -1,13 +1,16 @@
 //! Prometheus 格式导出模块
 //!
 //! 提供 Prometheus 兼容的指标导出功能，包括自定义指标注册和标签支持。
+//!
+//! 注意：部分功能正在开发中，暂未完全使用
+
+#![allow(dead_code)]
 
 use prometheus::{
-    core::Collector, Counter, CounterVec, Encoder, Gauge, GaugeVec, Histogram, HistogramOpts,
-    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
+    Counter, CounterVec, Encoder, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry, TextEncoder,
 };
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// 自定义 Prometheus 注册表
 pub struct PrometheusRegistry {
@@ -539,11 +542,11 @@ mod tests {
 
     #[test]
     fn test_label_builder() {
-        let labels = LabelBuilder::new()
+        let binding = LabelBuilder::new()
             .model("gpt-4")
             .provider("openai")
-            .user("user123")
-            .build();
+            .user("user123");
+        let labels = binding.build();
 
         assert_eq!(labels.len(), 3);
         assert!(labels.iter().any(|(k, _)| *k == "model"));

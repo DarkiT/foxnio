@@ -2,8 +2,8 @@
 //!
 //! 提供用于 SeaORM 实体的加密字段类型，支持透明加解密。
 
+#![allow(dead_code)]
 use crate::utils::{EncryptedString, EncryptionService};
-use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// 加密字符串字段
@@ -151,6 +151,7 @@ impl EncryptionHelper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
 
     fn create_test_encryption_service() -> EncryptionService {
         let key = EncryptionService::generate_master_key();

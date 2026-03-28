@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { api } from '$lib/api';
 
   interface AlertRule {
     id: string;
@@ -35,11 +36,8 @@
 
   async function loadAlertRules() {
     try {
-      const response = await fetch('/api/v1/alerts/rules');
-      if (response.ok) {
-        const data = await response.json();
-        alertRules = data.rules || [];
-      }
+      const data = await api.listAlertRules();
+      alertRules = data.rules || [];
     } catch (e) {
       console.error('Failed to load alert rules:', e);
     } finally {
@@ -49,17 +47,10 @@
 
   async function createRule() {
     try {
-      const response = await fetch('/api/v1/alerts/rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRule)
-      });
-
-      if (response.ok) {
-        await loadAlertRules();
-        showCreateModal = false;
-        resetForm();
-      }
+      await api.createAlertRule(newRule);
+      await loadAlertRules();
+      showCreateModal = false;
+      resetForm();
     } catch (e) {
       console.error('Failed to create alert rule:', e);
     }
@@ -67,16 +58,9 @@
 
   async function updateRule(rule: AlertRule) {
     try {
-      const response = await fetch(`/api/v1/alerts/rules/${rule.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rule)
-      });
-
-      if (response.ok) {
-        await loadAlertRules();
-        editingRule = null;
-      }
+      await api.updateAlertRule(rule.id, rule);
+      await loadAlertRules();
+      editingRule = null;
     } catch (e) {
       console.error('Failed to update alert rule:', e);
     }
@@ -86,13 +70,8 @@
     if (!confirm('Are you sure you want to delete this alert rule?')) return;
 
     try {
-      const response = await fetch(`/api/v1/alerts/rules/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        await loadAlertRules();
-      }
+      await api.deleteAlertRule(id);
+      await loadAlertRules();
     } catch (e) {
       console.error('Failed to delete alert rule:', e);
     }

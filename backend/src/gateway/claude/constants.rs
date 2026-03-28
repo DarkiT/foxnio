@@ -1,4 +1,8 @@
 //! Claude 渠道常量和配置
+//!
+//! 注意：部分常量和函数暂未使用，保留供未来扩展
+
+#![allow(dead_code)]
 
 /// Beta Header 常量
 pub const BETA_OAUTH: &str = "oauth-2025-04-20";

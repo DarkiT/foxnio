@@ -2,6 +2,7 @@
 //!
 //! 包含各模型的详细配置信息：max_tokens, pricing, context_window 等
 
+#![allow(dead_code)]
 use super::{Model, ModelProvider};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -124,7 +125,7 @@ impl From<&ModelConfig> for ModelInfo {
     }
 }
 
-/// 所有模型的配置
+// 所有模型的配置
 lazy_static! {
     pub static ref MODEL_CONFIGS: Vec<(Model, ModelConfig)> = vec![
     // ==================== OpenAI 模型 ====================

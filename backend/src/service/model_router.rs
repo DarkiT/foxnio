@@ -2,6 +2,7 @@
 //!
 //! 提供智能模型路由、降级和参数映射功能
 
+#![allow(dead_code)]
 use anyhow::{bail, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,6 +15,7 @@ use crate::gateway::models::{
 
 /// 模型路由器
 #[derive(Clone)]
+
 pub struct ModelRouter {
     /// 提供商配置
     providers: HashMap<ModelProvider, ProviderConfig>,

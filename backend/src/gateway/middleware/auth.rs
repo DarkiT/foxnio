@@ -1,5 +1,6 @@
 //! 中间件 - 完整实现
 
+#![allow(dead_code)]
 use axum::{
     body::Body,
     extract::State,
@@ -12,8 +13,7 @@ use serde_json::json;
 use std::time::Instant;
 
 use crate::gateway::SharedState;
-use crate::service::user::Claims;
-use crate::service::ApiKeyService;
+use crate::service::LegacyApiKeyService as ApiKeyService;
 
 /// API Key 认证中间件
 pub async fn api_key_auth(
@@ -131,8 +131,8 @@ pub fn cors_layer() -> tower_http::cors::CorsLayer {
 
 /// 速率限制中间件（基于 Redis）
 pub async fn rate_limit(
-    State(state): State<SharedState>,
-    Extension(user_id): Extension<uuid::Uuid>,
+    State(_state): State<SharedState>,
+    Extension(_user_id): Extension<uuid::Uuid>,
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
@@ -146,8 +146,8 @@ pub async fn rate_limit(
 
 /// 并发限制中间件
 pub async fn concurrency_limit(
-    State(state): State<SharedState>,
-    Extension(user_id): Extension<uuid::Uuid>,
+    State(_state): State<SharedState>,
+    Extension(_user_id): Extension<uuid::Uuid>,
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
@@ -165,7 +165,7 @@ pub async fn request_id(mut req: Request<Body>, next: Next) -> Response {
         .get("x-request-id")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
-        .unwrap_or_else(|| crate::utils::request_id());
+        .unwrap_or_else(crate::utils::request_id);
 
     req.extensions_mut().insert(request_id.clone());
 
@@ -195,7 +195,6 @@ pub async fn error_handler(req: Request<Body>, next: Next) -> Response {
 
 #[cfg(test)]
 mod middleware_tests {
-    use super::*;
 
     #[test]
     fn test_request_id_format() {

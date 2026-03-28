@@ -1,11 +1,14 @@
 //! 告警管理器模块
 //!
 //! 提供告警规则管理、检查和发送功能
+//!
+//! 预留功能：告警管理器（扩展功能）
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::RwLock;
 
 use super::{
@@ -154,11 +157,17 @@ impl AlertManager {
     }
 
     /// 列出所有通道
-    pub async fn list_channels(&self) -> Vec<(String, AlertChannelType)> {
+    pub async fn list_channels(&self) -> Vec<(String, AlertChannelType, String)> {
         let channels = self.channels.read().await;
         channels
             .iter()
-            .map(|(id, channel)| (id.clone(), channel.channel_type()))
+            .map(|(id, channel)| {
+                (
+                    id.clone(),
+                    channel.channel_type(),
+                    channel.name().to_string(),
+                )
+            })
             .collect()
     }
 
@@ -185,7 +194,7 @@ impl AlertManager {
     }
 
     /// 检查规则是否被静默
-    async fn is_silenced(&self, rule_name: &str) -> bool {
+    pub async fn is_silenced(&self, rule_name: &str) -> bool {
         let silence_rules = self.silence_rules.read().await;
         silence_rules
             .iter()
@@ -286,12 +295,28 @@ impl AlertManager {
         // 发送到所有通道
         for channel_id in channel_ids {
             if let Some(channel) = channels.get(&channel_id) {
+                // 检查通道是否可用
+                if !channel.is_available() {
+                    entry.add_result(AlertSendResult::failure(
+                        channel.channel_type(),
+                        format!("Channel {} is not available", channel.name()),
+                    ));
+                    continue;
+                }
                 let result = channel.send(&alert).await;
                 entry.add_result(result);
             } else if let Some(channel) = channels
                 .values()
                 .find(|c| c.channel_type().as_str() == channel_id)
             {
+                // 检查通道是否可用
+                if !channel.is_available() {
+                    entry.add_result(AlertSendResult::failure(
+                        channel.channel_type(),
+                        format!("Channel {} is not available", channel.name()),
+                    ));
+                    continue;
+                }
                 let result = channel.send(&alert).await;
                 entry.add_result(result);
             }
@@ -496,7 +521,7 @@ mod tests {
         let manager = AlertManager::with_defaults();
 
         // 注册一个测试通道
-        let result = manager
+        let _result = manager
             .register_channel(
                 "test-email".to_string(),
                 AlertChannelType::Webhook,

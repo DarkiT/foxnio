@@ -1,4 +1,9 @@
 //! TLS 指纹配置
+//!
+//! 预留功能：TLS 指纹模板管理（P0 功能）
+//! 参考：NEXT_ALIGNMENT_PLAN.md - TLS 指纹 Profile 支持
+
+#![allow(dead_code)]
 
 /// TLS 指纹配置
 ///

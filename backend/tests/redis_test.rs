@@ -85,7 +85,7 @@ mod tests {
         assert!(ttl > 0 && ttl <= 60);
 
         // 清理
-        conn.del(key).await.ok();
+        let _: () = conn.del(key).await.unwrap_or(());
     }
 
     #[tokio::test]
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(result, 1);
 
         // 清理
-        conn.del(key).await.ok();
+        let _: () = conn.del(key).await.unwrap_or(());
     }
 
     #[tokio::test]
@@ -156,7 +156,7 @@ mod tests {
         assert_eq!(result.len(), 3);
 
         // 清理
-        conn.del(key).await.ok();
+        let _: () = conn.del(key).await.unwrap_or(());
     }
 
     #[tokio::test]
@@ -192,7 +192,7 @@ mod tests {
         assert!(!result);
 
         // 清理
-        conn.del(key).await.ok();
+        let _: () = conn.del(key).await.unwrap_or(());
     }
 
     #[tokio::test]
@@ -228,6 +228,6 @@ mod tests {
         }
 
         // 清理
-        conn.del(key).await.ok();
+        let _: () = conn.del(key).await.unwrap_or(());
     }
 }

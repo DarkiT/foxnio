@@ -120,29 +120,57 @@ class ApiClient {
     return this.request('/api/v1/admin/accounts');
   }
 
-  // Alerts
+  // Alerts - 使用管理员路径
   async listAlertRules(): Promise<{ rules: AlertRule[] }> {
-    return this.request('/api/v1/alerts/rules');
+    return this.request('/api/v1/admin/alerts/rules');
   }
 
   async createAlertRule(rule: Partial<AlertRule>): Promise<AlertRule> {
-    return this.request('/api/v1/alerts/rules', {
+    return this.request('/api/v1/admin/alerts/rules', {
       method: 'POST',
       body: JSON.stringify(rule),
     });
   }
 
   async updateAlertRule(id: string, rule: Partial<AlertRule>): Promise<AlertRule> {
-    return this.request(`/api/v1/alerts/rules/${id}`, {
+    return this.request(`/api/v1/admin/alerts/rules/${id}`, {
       method: 'PUT',
       body: JSON.stringify(rule),
     });
   }
 
   async deleteAlertRule(id: string): Promise<void> {
-    return this.request(`/api/v1/alerts/rules/${id}`, {
+    return this.request(`/api/v1/admin/alerts/rules/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Alert channels
+  async listAlertChannels(): Promise<{ channels: AlertChannel[] }> {
+    return this.request('/api/v1/admin/alerts/channels');
+  }
+
+  async createAlertChannel(channel: Partial<AlertChannel>): Promise<AlertChannel> {
+    return this.request('/api/v1/admin/alerts/channels', {
+      method: 'POST',
+      body: JSON.stringify(channel),
+    });
+  }
+
+  async deleteAlertChannel(id: string): Promise<void> {
+    return this.request(`/api/v1/admin/alerts/channels/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Alert history
+  async listAlertHistory(): Promise<{ history: AlertHistory[] }> {
+    return this.request('/api/v1/admin/alerts/history');
+  }
+
+  // Alert stats
+  async getAlertStats(): Promise<AlertStats> {
+    return this.request('/api/v1/admin/alerts/stats');
   }
 }
 
@@ -157,6 +185,32 @@ export interface AlertRule {
   enabled: boolean;
   created_at: string;
   last_triggered_at: string | null;
+}
+
+export interface AlertChannel {
+  id: string;
+  name: string;
+  type: 'email' | 'webhook' | 'slack' | 'dingtalk' | 'feishu';
+  config: Record<string, any>;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface AlertHistory {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  triggered_at: string;
+  resolved_at: string | null;
+  status: 'firing' | 'resolved';
+  message: string;
+}
+
+export interface AlertStats {
+  total_rules: number;
+  active_rules: number;
+  total_alerts_today: number;
+  total_alerts_week: number;
 }
 
 export const api = new ApiClient();

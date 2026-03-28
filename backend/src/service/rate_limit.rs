@@ -1,5 +1,6 @@
 //! Redis 速率限制实现
 
+#![allow(dead_code)]
 use anyhow::Result;
 use redis::{AsyncCommands, Client};
 use std::sync::Arc;

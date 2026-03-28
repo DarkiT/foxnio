@@ -1,5 +1,8 @@
 //! 智能调度服务 - 完整实现
+//!
+//! 支持多种调度策略，集成健康评分和粘性会话
 
+#![allow(dead_code)]
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::DatabaseConnection;
@@ -7,7 +10,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use super::AccountService;
+use super::health_scorer::HealthScorer;
+use super::LegacyAccountService as AccountService;
 use crate::entity::accounts;
 use crate::gateway::FailoverManager;
 
@@ -24,6 +28,10 @@ pub enum SchedulingStrategy {
     PriorityFirst,
     /// 随机
     Random,
+    /// 健康感知调度（优先选择健康账号）
+    HealthAware,
+    /// 智能调度（综合考虑健康、负载、延迟）
+    Smart,
 }
 
 /// 账号运行时状态
@@ -35,6 +43,8 @@ pub struct AccountRuntimeState {
     pub total_errors: i64,
     pub last_used: Option<DateTime<Utc>>,
     pub is_available: bool,
+    /// 健康分数缓存
+    pub health_score: f64,
 }
 
 /// 粘性会话信息
@@ -52,6 +62,7 @@ pub struct SchedulerService {
     account_service: AccountService,
     failover_manager: FailoverManager,
     strategy: SchedulingStrategy,
+    health_scorer: Option<Arc<HealthScorer>>,
 
     // 运行时状态
     runtime_states: Arc<RwLock<HashMap<uuid::Uuid, AccountRuntimeState>>>,
@@ -70,6 +81,26 @@ impl SchedulerService {
             account_service,
             failover_manager: FailoverManager::new(Default::default()),
             strategy,
+            health_scorer: None,
+            runtime_states: Arc::new(RwLock::new(HashMap::new())),
+            sticky_sessions: Arc::new(RwLock::new(HashMap::new())),
+            round_robin_index: Arc::new(RwLock::new(0)),
+        }
+    }
+
+    /// 创建带健康评分的调度器
+    pub fn with_health_scorer(
+        db: DatabaseConnection,
+        account_service: AccountService,
+        strategy: SchedulingStrategy,
+        health_scorer: Arc<HealthScorer>,
+    ) -> Self {
+        Self {
+            db,
+            account_service,
+            failover_manager: FailoverManager::new(Default::default()),
+            strategy,
+            health_scorer: Some(health_scorer),
             runtime_states: Arc::new(RwLock::new(HashMap::new())),
             sticky_sessions: Arc::new(RwLock::new(HashMap::new())),
             round_robin_index: Arc::new(RwLock::new(0)),
@@ -81,7 +112,7 @@ impl SchedulerService {
         &self,
         model: &str,
         session_id: Option<&str>,
-        user_concurrent_limit: i32,
+        _user_concurrent_limit: i32,
     ) -> Result<Option<accounts::Model>> {
         // 1. 检查粘性会话
         if let Some(sid) = session_id {
@@ -114,6 +145,8 @@ impl SchedulerService {
             SchedulingStrategy::PriorityFirst => self.select_priority_first(accounts).await,
             SchedulingStrategy::Random => self.select_random(accounts).await,
             SchedulingStrategy::WeightedRoundRobin => self.select_weighted(accounts).await,
+            SchedulingStrategy::HealthAware => self.select_health_aware(accounts).await,
+            SchedulingStrategy::Smart => self.select_smart(accounts).await,
         };
 
         // 5. 设置粘性会话
@@ -293,6 +326,7 @@ impl SchedulerService {
             total_errors: 0,
             last_used: None,
             is_available: true,
+            health_score: 100.0,
         });
 
         state.current_connections += 1;
@@ -341,6 +375,98 @@ impl SchedulerService {
         sessions
             .retain(|_, session| (now - session.last_accessed).num_seconds() <= max_age_seconds);
     }
+
+    /// 健康感知调度 - 优先选择健康分数高的账号
+    async fn select_health_aware(&self, accounts: Vec<accounts::Model>) -> Option<accounts::Model> {
+        if accounts.is_empty() {
+            return None;
+        }
+
+        // 如果有健康评分器，使用健康分数
+        if let Some(ref scorer) = self.health_scorer {
+            let mut scored_accounts = Vec::new();
+            for account in accounts {
+                let score = scorer.get_score(account.id).await;
+                scored_accounts.push((account, score));
+            }
+
+            // 按健康分数降序排序，选择最健康的
+            scored_accounts
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            return scored_accounts.into_iter().next().map(|(a, _)| a);
+        }
+
+        // 回退到优先级优先
+        self.select_priority_first(accounts).await
+    }
+
+    /// 智能调度 - 综合考虑健康分数、连接数、优先级
+    async fn select_smart(&self, accounts: Vec<accounts::Model>) -> Option<accounts::Model> {
+        if accounts.is_empty() {
+            return None;
+        }
+
+        let states = self.runtime_states.read().await;
+
+        // 计算每个账号的综合得分
+        let mut scored_accounts: Vec<(accounts::Model, f64)> = accounts
+            .into_iter()
+            .map(|account| {
+                let state = states.get(&account.id);
+
+                // 健康分数（权重 40%）
+                let health_score = if let Some(ref scorer) = self.health_scorer {
+                    futures::executor::block_on(scorer.get_score(account.id))
+                } else {
+                    // 从运行时状态估算
+                    state
+                        .map(|s| {
+                            if s.total_requests > 0 {
+                                let success_rate =
+                                    1.0 - (s.total_errors as f64 / s.total_requests as f64);
+                                success_rate * 100.0
+                            } else {
+                                100.0
+                            }
+                        })
+                        .unwrap_or(100.0)
+                };
+
+                // 连接负载（权重 30%）
+                let conn_score = state
+                    .map(|s| {
+                        let limit = account.concurrent_limit.unwrap_or(5) as f64;
+                        let used = s.current_connections as f64;
+                        // 使用率越低，得分越高
+                        (1.0 - (used / limit).min(1.0)) * 100.0
+                    })
+                    .unwrap_or(100.0);
+
+                // 优先级（权重 30%）
+                let priority_score = (account.priority as f64 + 1.0) / 10.0 * 100.0;
+
+                // 综合得分
+                let total = health_score * 0.4 + conn_score * 0.3 + priority_score * 0.3;
+
+                (account, total)
+            })
+            .collect();
+
+        // 按综合得分降序排序
+        scored_accounts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        scored_accounts.into_iter().next().map(|(a, _)| a)
+    }
+
+    /// 更新账号健康分数缓存
+    pub async fn update_health_scores(&self) {
+        if let Some(ref scorer) = self.health_scorer {
+            let mut states = self.runtime_states.write().await;
+            for (account_id, state) in states.iter_mut() {
+                state.health_score = scorer.get_score(*account_id).await;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -362,6 +488,7 @@ mod tests {
             total_errors: 2,
             last_used: Some(Utc::now()),
             is_available: true,
+            health_score: 100.0,
         };
 
         assert_eq!(state.current_connections, 5);

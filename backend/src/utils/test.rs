@@ -23,10 +23,10 @@ mod tests {
         let hash = crypto::hash_password(password).unwrap();
 
         // 正确密码应该验证通过
-        assert!(crypto::verify_password(password, &hash));
+        assert!(crypto::verify_password(password, &hash).unwrap());
 
         // 错误密码应该验证失败
-        assert!(!crypto::verify_password("wrong_password", &hash));
+        assert!(!crypto::verify_password("wrong_password", &hash).unwrap());
     }
 
     #[test]

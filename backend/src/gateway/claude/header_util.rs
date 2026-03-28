@@ -2,6 +2,7 @@
 //!
 //! 处理 HTTP Header 的大小写和顺序
 
+#![allow(dead_code)]
 use std::collections::HashMap;
 
 /// Header 大小写映射（真实 Claude CLI 抓包）

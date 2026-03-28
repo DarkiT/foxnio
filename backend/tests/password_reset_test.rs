@@ -3,7 +3,6 @@
 use chrono::{Duration, Utc};
 use foxnio::entity::password_reset_tokens;
 use foxnio::service::email::{EmailSender, MockEmailSender};
-use foxnio::service::password_reset::*;
 use sha2::{Digest, Sha256};
 
 /// 测试 token 生成和哈希

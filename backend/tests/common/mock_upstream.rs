@@ -208,7 +208,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.status(), reqwest::StatusCode::OK);
 
         server.stop().await;
     }
@@ -229,7 +229,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.status(), reqwest::StatusCode::OK);
 
         let body: serde_json::Value = resp.json().await.unwrap();
         assert_eq!(body["object"], "chat.completion");
@@ -251,7 +251,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(resp.status(), reqwest::StatusCode::INTERNAL_SERVER_ERROR);
 
         server.stop().await;
     }

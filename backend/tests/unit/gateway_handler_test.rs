@@ -285,7 +285,7 @@ mod tests {
 // 测试辅助函数
 
 /// 创建测试用的 GatewayHandler
-#[allow(dead_code)]
+
 async fn create_test_handler(_upstream_url: String) -> () {
     // TODO: 实现测试辅助函数
     /*
@@ -302,7 +302,7 @@ async fn create_test_handler(_upstream_url: String) -> () {
 }
 
 /// 创建没有账号的测试 Handler
-#[allow(dead_code)]
+
 async fn create_test_handler_with_no_accounts() -> () {
     // TODO: 实现测试辅助函数
     /*

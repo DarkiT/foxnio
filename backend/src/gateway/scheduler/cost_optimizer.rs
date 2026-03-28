@@ -1,6 +1,10 @@
 //! 成本优化器模块
 //!
 //! 提供成本计算、预算控制和成本优化策略
+//!
+//! 预留功能：成本优化器（扩展功能）
+
+#![allow(dead_code)]
 
 use chrono::{DateTime, Datelike, Utc};
 use serde::{Deserialize, Serialize};
@@ -30,8 +34,8 @@ pub struct CostConfig {
 impl Default for CostConfig {
     fn default() -> Self {
         Self {
-            monthly_budget_cents: 100_000_00, // $100,000
-            daily_budget_cents: 3_300_00,     // $3,300
+            monthly_budget_cents: 10_000_000, // $100,000 (in cents)
+            daily_budget_cents: 330_000,      // $3,300 (in cents)
             warning_threshold_percent: 80,
             stop_threshold_percent: 95,
             optimization_weight: 0.3,
@@ -414,8 +418,14 @@ impl CostOptimizer {
             let avg_cost = total_cost / recent.len() as u64;
 
             // 成本越低，分数越低（越好）
-            // 使用对数缩放
-            (avg_cost as f64).ln() / 10.0
+            // 使用对数缩放，确保分数在 0-1 范围内
+            if avg_cost == 0 {
+                0.0 // 免费使用，最优
+            } else {
+                // ln(avg_cost + 1) 确保正值，然后归一化
+                let raw_score = ((avg_cost + 1) as f64).ln() / 10.0;
+                raw_score.clamp(0.0, 1.0)
+            }
         } else {
             0.5
         }

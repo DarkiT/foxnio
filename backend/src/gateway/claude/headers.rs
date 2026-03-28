@@ -1,7 +1,7 @@
 //! Claude 请求头构建器
 
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use std::collections::HashMap;
+#![allow(dead_code)]
+use reqwest::header::HeaderMap;
 
 /// Claude Code 请求头配置
 #[derive(Debug, Clone)]

@@ -1,10 +1,12 @@
 //! 敏感数据加密服务
+
 //!
 //! 使用 AES-256-GCM 进行数据加密，支持：
 //! - 密钥轮换（旧密钥解密，新密钥加密）
 //! - 透明加解密层
 //! - 安全的密钥管理
 
+#![allow(dead_code)]
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -12,10 +14,9 @@ use aes_gcm::{
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use rand::RngCore;
-use sha2::{Digest, Sha256};
 use std::env;
 use thiserror::Error;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::ZeroizeOnDrop;
 
 /// 加密相关错误
 #[derive(Debug, Error)]

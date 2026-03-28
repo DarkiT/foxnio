@@ -91,12 +91,12 @@ mod tests {
 
         let tokens = (1000, 500); // input, output
 
-        let models = vec![
-            ("gpt-4-turbo", 10, 30),
-            ("gpt-4o", 2.5, 10),
+        let models: Vec<(&str, f64, f64)> = vec![
+            ("gpt-4-turbo", 10.0, 30.0),
+            ("gpt-4o", 2.5, 10.0),
             ("gpt-4o-mini", 0.15, 0.6),
-            ("claude-3-opus", 15, 75),
-            ("claude-3-sonnet", 3, 15),
+            ("claude-3-opus", 15.0, 75.0),
+            ("claude-3-sonnet", 3.0, 15.0),
             ("claude-3-haiku", 0.25, 1.25),
         ];
 

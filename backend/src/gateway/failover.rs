@@ -1,5 +1,6 @@
 //! 故障转移实现
 
+#![allow(dead_code)]
 use anyhow::{bail, Result};
 use std::collections::HashMap;
 use std::sync::Arc;

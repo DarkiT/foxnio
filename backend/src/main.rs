@@ -1,5 +1,7 @@
 //! 应用入口
 
+#![allow(dead_code)]
+
 use anyhow::Result;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

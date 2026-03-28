@@ -2,20 +2,20 @@
 //!
 //! 提供审计日志的记录、查询和管理功能
 
+#![allow(dead_code)]
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set,
+    QueryOrder, Set,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::entity::audit_logs;
-use crate::entity::audit_logs::{AuditAction, SanitizedAuditLog};
+use crate::entity::audit_logs::AuditAction;
 
 /// 审计日志条目（用于创建）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,7 +118,7 @@ impl AuditEntry {
     /// 创建管理员操作审计条目
     pub fn admin_action(
         admin_id: Uuid,
-        action: &str,
+        _action: &str,
         resource_type: &str,
         resource_id: &str,
         ip: Option<String>,

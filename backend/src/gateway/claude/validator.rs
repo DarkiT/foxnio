@@ -2,6 +2,7 @@
 //!
 //! 验证请求是否来自真实的 Claude Code CLI
 
+#![allow(dead_code)]
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -287,10 +288,10 @@ mod tests {
         });
         assert!(validator.has_claude_code_system_prompt(&body));
 
-        // 不包含
+        // 不包含 - 使用完全不同的内容
         let body = serde_json::json!({
             "system": [
-                {"type": "text", "text": "You are a helpful assistant."}
+                {"type": "text", "text": "Hello world, this is a test message."}
             ]
         });
         assert!(!validator.has_claude_code_system_prompt(&body));

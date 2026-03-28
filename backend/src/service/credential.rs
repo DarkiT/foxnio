@@ -2,18 +2,15 @@
 //!
 //! 提供对敏感凭证（API Keys, OAuth Tokens, TOTP Secrets）的加密管理
 
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::entity::{
-    accounts, oauth_tokens,
-    oauth_tokens::{CreateOAuthToken, OAuthProviderType},
-    users,
-};
-use crate::utils::{encryption_service, get_encryption_service, EncryptionService};
+use crate::entity::{accounts, oauth_tokens, oauth_tokens::CreateOAuthToken, users};
+use crate::utils::{get_encryption_service, EncryptionService};
 
 /// 加密凭证服务
 pub struct CredentialService {

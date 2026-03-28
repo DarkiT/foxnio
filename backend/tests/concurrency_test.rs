@@ -2,7 +2,22 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::service::concurrency::{ConcurrencyConfig, ConcurrencyController, ConcurrencyError};
+    use foxnio::service::concurrency::{
+        ConcurrencyConfig, ConcurrencyController, ConcurrencyError,
+    };
+
+    fn test_config() -> ConcurrencyConfig {
+        ConcurrencyConfig {
+            user_max_concurrent: 5,
+            account_max_concurrent: 10,
+            api_key_max_concurrent: 5,
+            global_max_concurrent: 100,
+            enable_dynamic_adjustment: false,
+            adjustment_interval_seconds: 60,
+            high_load_threshold: 0.8,
+            low_load_threshold: 0.3,
+        }
+    }
 
     #[tokio::test]
     async fn test_concurrency_controller_creation() {
@@ -17,13 +32,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_acquire_success() {
-        let config = ConcurrencyConfig {
-            user_max_concurrent: 5,
-            account_max_concurrent: 10,
-            api_key_max_concurrent: 5,
-            global_max_concurrent: 100,
-        };
-
+        let config = test_config();
         let controller = ConcurrencyController::new(config);
 
         let result = controller.try_acquire("user1", "account1", "key1").await;
@@ -38,6 +47,10 @@ mod tests {
             account_max_concurrent: 10,
             api_key_max_concurrent: 10,
             global_max_concurrent: 100,
+            enable_dynamic_adjustment: false,
+            adjustment_interval_seconds: 60,
+            high_load_threshold: 0.8,
+            low_load_threshold: 0.3,
         };
 
         let controller = ConcurrencyController::new(config);
@@ -55,7 +68,7 @@ mod tests {
         // 第三个应该失败
         let result = controller.try_acquire("user1", "account3", "key3").await;
 
-        assert!(matches!(result, Err(ConcurrencyError::UserLimitReached)));
+        assert!(matches!(result, Err(ConcurrencyError::User)));
     }
 
     #[tokio::test]
@@ -65,6 +78,10 @@ mod tests {
             account_max_concurrent: 100,
             api_key_max_concurrent: 100,
             global_max_concurrent: 2,
+            enable_dynamic_adjustment: false,
+            adjustment_interval_seconds: 60,
+            high_load_threshold: 0.8,
+            low_load_threshold: 0.3,
         };
 
         let controller = ConcurrencyController::new(config);
@@ -82,7 +99,7 @@ mod tests {
         // 第三个应该失败（全局限制）
         let result = controller.try_acquire("user3", "account3", "key3").await;
 
-        assert!(matches!(result, Err(ConcurrencyError::GlobalLimitReached)));
+        assert!(matches!(result, Err(ConcurrencyError::Global)));
     }
 
     #[tokio::test]
@@ -109,10 +126,10 @@ mod tests {
     #[test]
     fn test_concurrency_error_display() {
         let errors = vec![
-            ConcurrencyError::GlobalLimitReached,
-            ConcurrencyError::UserLimitReached,
-            ConcurrencyError::AccountLimitReached,
-            ConcurrencyError::ApiKeyLimitReached,
+            ConcurrencyError::Global,
+            ConcurrencyError::User,
+            ConcurrencyError::Account,
+            ConcurrencyError::ApiKey,
         ];
 
         for error in errors {

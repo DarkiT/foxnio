@@ -1,262 +1,251 @@
-//! 公告管理系统
+//! Announcement Service
 
+#![allow(dead_code)]
+
+use crate::entity::{announcements, announcement_reads};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sea_orm::DatabaseConnection;
+use sea_orm::*;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use serde_json::Value as JsonValue;
 
-/// 公告类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum AnnouncementType {
-    Info,
-    Warning,
-    Maintenance,
-    Update,
-    Promotion,
+#[derive(Debug, Deserialize)]
+pub struct CreateAnnouncementRequest {
+    pub title: String,
+    pub content: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub notify_mode: String,
+    pub targeting: Option<JsonValue>,
+    pub starts_at: Option<DateTime<Utc>>,
+    pub ends_at: Option<DateTime<Utc>>,
+    pub created_by: Option<i64>,
 }
 
-impl std::fmt::Display for AnnouncementType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AnnouncementType::Info => write!(f, "info"),
-            AnnouncementType::Warning => write!(f, "warning"),
-            AnnouncementType::Maintenance => write!(f, "maintenance"),
-            AnnouncementType::Update => write!(f, "update"),
-            AnnouncementType::Promotion => write!(f, "promotion"),
+#[derive(Debug, Deserialize)]
+pub struct UpdateAnnouncementRequest {
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub status: Option<String>,
+    pub notify_mode: Option<String>,
+    pub targeting: Option<JsonValue>,
+    pub starts_at: Option<DateTime<Utc>>,
+    pub ends_at: Option<DateTime<Utc>>,
+    pub updated_by: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AnnouncementResponse {
+    pub id: i64,
+    pub title: String,
+    pub content: String,
+    pub status: String,
+    pub notify_mode: String,
+    pub targeting: Option<JsonValue>,
+    pub starts_at: Option<DateTime<Utc>>,
+    pub ends_at: Option<DateTime<Utc>>,
+    pub created_by: Option<i64>,
+    pub updated_by: Option<i64>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub is_read: Option<bool>,
+}
+
+impl From<announcements::Model> for AnnouncementResponse {
+    fn from(model: announcements::Model) -> Self {
+        Self {
+            id: model.id,
+            title: model.title,
+            content: model.content,
+            status: model.status,
+            notify_mode: model.notify_mode,
+            targeting: model.targeting,
+            starts_at: model.starts_at,
+            ends_at: model.ends_at,
+            created_by: model.created_by,
+            updated_by: model.updated_by,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            is_read: None,
         }
     }
 }
 
-/// 公告
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Announcement {
-    pub id: Uuid,
-    pub title: String,
-    pub content: String,
-    pub announcement_type: AnnouncementType,
-    pub priority: i32,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
-    pub is_active: bool,
-    pub is_pinned: bool,
-    pub created_by: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// 公告阅读记录
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnnouncementRead {
-    pub id: Uuid,
-    pub announcement_id: Uuid,
-    pub user_id: Uuid,
-    pub read_at: DateTime<Utc>,
-}
-
-/// 公告服务
-pub struct AnnouncementService {
-    db: DatabaseConnection,
-}
+pub struct AnnouncementService;
 
 impl AnnouncementService {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
-    }
-
-    /// 创建公告
+    /// Create a new announcement
     pub async fn create(
-        &self,
-        title: String,
-        content: String,
-        announcement_type: AnnouncementType,
-        priority: i32,
-        start_time: Option<DateTime<Utc>>,
-        end_time: Option<DateTime<Utc>>,
-        created_by: Uuid,
-    ) -> Result<Announcement> {
+        db: &DatabaseConnection,
+        req: CreateAnnouncementRequest,
+    ) -> Result<AnnouncementResponse> {
         let now = Utc::now();
-
-        let announcement = Announcement {
-            id: Uuid::new_v4(),
-            title,
-            content,
-            announcement_type,
-            priority,
-            start_time,
-            end_time,
-            is_active: true,
-            is_pinned: false,
-            created_by,
-            created_at: now,
-            updated_at: now,
+        let announcement = announcements::ActiveModel {
+            id: ActiveValue::NotSet,
+            title: ActiveValue::Set(req.title),
+            content: ActiveValue::Set(req.content),
+            status: ActiveValue::Set(req.status),
+            notify_mode: ActiveValue::Set(req.notify_mode),
+            targeting: ActiveValue::Set(req.targeting),
+            starts_at: ActiveValue::Set(req.starts_at),
+            ends_at: ActiveValue::Set(req.ends_at),
+            created_by: ActiveValue::Set(req.created_by),
+            updated_by: ActiveValue::Set(None),
+            created_at: ActiveValue::Set(now),
+            updated_at: ActiveValue::Set(now),
         };
 
-        // TODO: 保存到数据库
-        Ok(announcement)
+        let result = announcement.insert(db).await?;
+        Ok(result.into())
     }
 
-    /// 获取有效公告列表
-    pub async fn list_active(&self, _user_id: Option<Uuid>) -> Result<Vec<Announcement>> {
-        let now = Utc::now();
+    /// Get announcement by ID
+    pub async fn get_by_id(db: &DatabaseConnection, id: i64) -> Result<Option<AnnouncementResponse>> {
+        let result = announcements::Entity::find_by_id(id)
+            .one(db)
+            .await?;
 
-        // TODO: 从数据库查询
-        // 条件：is_active = true
-        //      AND (start_time IS NULL OR start_time <= now)
-        //      AND (end_time IS NULL OR end_time >= now)
-        // ORDER BY is_pinned DESC, priority DESC, created_at DESC
-
-        Ok(vec![])
+        Ok(result.map(|m| m.into()))
     }
 
-    /// 获取未读公告
-    pub async fn list_unread(&self, _user_id: Uuid) -> Result<Vec<Announcement>> {
-        // TODO: 查询用户未读的公告
-        Ok(vec![])
+    /// List all announcements
+    pub async fn list(
+        db: &DatabaseConnection,
+        status: Option<String>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<Vec<AnnouncementResponse>> {
+        let mut query = announcements::Entity::find();
+
+        if let Some(s) = status {
+            query = query.filter(announcements::Column::Status.eq(s));
+        }
+
+        let results = query
+            .order_by_desc(announcements::Column::CreatedAt)
+            .paginate(db, page_size)
+            .fetch_page(page)
+            .await?;
+
+        Ok(results.into_iter().map(|m| m.into()).collect())
     }
 
-    /// 标记公告为已读
-    pub async fn mark_as_read(&self, _announcement_id: Uuid, _user_id: Uuid) -> Result<()> {
-        // TODO: 插入阅读记录
-        Ok(())
-    }
-
-    /// 标记所有公告为已读
-    pub async fn mark_all_as_read(&self, _user_id: Uuid) -> Result<i32> {
-        // TODO: 批量插入阅读记录
-        Ok(0)
-    }
-
-    /// 更新公告
+    /// Update announcement
     pub async fn update(
-        &self,
-        _announcement_id: Uuid,
-        _updates: AnnouncementUpdates,
-    ) -> Result<Announcement> {
-        // TODO: 更新数据库
-        bail!("Not implemented")
+        db: &DatabaseConnection,
+        id: i64,
+        req: UpdateAnnouncementRequest,
+    ) -> Result<Option<AnnouncementResponse>> {
+        let announcement = announcements::Entity::find_by_id(id)
+            .one(db)
+            .await?;
+
+        match announcement {
+            Some(model) => {
+                let mut active_model: announcements::ActiveModel = model.into();
+                
+                if let Some(title) = req.title {
+                    active_model.title = ActiveValue::Set(title);
+                }
+                if let Some(content) = req.content {
+                    active_model.content = ActiveValue::Set(content);
+                }
+                if let Some(status) = req.status {
+                    active_model.status = ActiveValue::Set(status);
+                }
+                if let Some(notify_mode) = req.notify_mode {
+                    active_model.notify_mode = ActiveValue::Set(notify_mode);
+                }
+                if let Some(targeting) = req.targeting {
+                    active_model.targeting = ActiveValue::Set(Some(targeting));
+                }
+                if let Some(starts_at) = req.starts_at {
+                    active_model.starts_at = ActiveValue::Set(Some(starts_at));
+                }
+                if let Some(ends_at) = req.ends_at {
+                    active_model.ends_at = ActiveValue::Set(Some(ends_at));
+                }
+                if let Some(updated_by) = req.updated_by {
+                    active_model.updated_by = ActiveValue::Set(Some(updated_by));
+                }
+                active_model.updated_at = ActiveValue::Set(Utc::now());
+
+                let result = active_model.update(db).await?;
+                Ok(Some(result.into()))
+            }
+            None => Ok(None),
+        }
     }
 
-    /// 删除公告
-    pub async fn delete(&self, _announcement_id: Uuid) -> Result<()> {
-        // TODO: 从数据库删除
-        Ok(())
+    /// Delete announcement
+    pub async fn delete(db: &DatabaseConnection, id: i64) -> Result<bool> {
+        let result = announcements::Entity::delete_by_id(id)
+            .exec(db)
+            .await?;
+
+        Ok(result.rows_affected > 0)
     }
 
-    /// 置顶/取消置顶
-    pub async fn set_pinned(&self, _announcement_id: Uuid, _pinned: bool) -> Result<()> {
-        // TODO: 更新数据库
-        Ok(())
-    }
-
-    /// 启用/禁用公告
-    pub async fn set_active(&self, _announcement_id: Uuid, _active: bool) -> Result<()> {
-        // TODO: 更新数据库
-        Ok(())
-    }
-
-    /// 获取公告统计
-    pub async fn get_stats(&self, _announcement_id: Uuid) -> Result<AnnouncementStats> {
-        Ok(AnnouncementStats {
-            total_reads: 0,
-            unique_readers: 0,
-        })
-    }
-
-    /// 清理过期公告
-    pub async fn cleanup_expired(&self) -> Result<i32> {
-        // TODO: 删除过期的公告
-        Ok(0)
-    }
-}
-
-/// 公告更新
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnnouncementUpdates {
-    pub title: Option<String>,
-    pub content: Option<String>,
-    pub announcement_type: Option<AnnouncementType>,
-    pub priority: Option<i32>,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
-    pub is_active: Option<bool>,
-    pub is_pinned: Option<bool>,
-}
-
-/// 公告统计
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnnouncementStats {
-    pub total_reads: i32,
-    pub unique_readers: i32,
-}
-
-use anyhow::bail;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_announcement_type_display() {
-        assert_eq!(AnnouncementType::Info.to_string(), "info");
-        assert_eq!(AnnouncementType::Warning.to_string(), "warning");
-        assert_eq!(AnnouncementType::Maintenance.to_string(), "maintenance");
-        assert_eq!(AnnouncementType::Update.to_string(), "update");
-        assert_eq!(AnnouncementType::Promotion.to_string(), "promotion");
-    }
-
-    #[test]
-    fn test_announcement_creation() {
-        let announcement = Announcement {
-            id: Uuid::new_v4(),
-            title: "系统维护通知".to_string(),
-            content: "系统将于今晚进行维护".to_string(),
-            announcement_type: AnnouncementType::Maintenance,
-            priority: 10,
-            start_time: None,
-            end_time: None,
-            is_active: true,
-            is_pinned: false,
-            created_by: Uuid::new_v4(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+    /// Mark announcement as read
+    pub async fn mark_as_read(
+        db: &DatabaseConnection,
+        announcement_id: i64,
+        user_id: i64,
+    ) -> Result<()> {
+        let now = Utc::now();
+        let read = announcement_reads::ActiveModel {
+            id: ActiveValue::NotSet,
+            announcement_id: ActiveValue::Set(announcement_id),
+            user_id: ActiveValue::Set(user_id),
+            read_at: ActiveValue::Set(now),
         };
 
-        assert_eq!(announcement.title, "系统维护通知");
-        assert_eq!(announcement.priority, 10);
-        assert!(announcement.is_active);
+        read.insert(db).await?;
+        Ok(())
     }
 
-    #[test]
-    fn test_announcement_updates() {
-        let updates = AnnouncementUpdates {
-            title: Some("新标题".to_string()),
-            content: None,
-            announcement_type: Some(AnnouncementType::Warning),
-            priority: Some(5),
-            start_time: None,
-            end_time: None,
-            is_active: Some(false),
-            is_pinned: Some(true),
-        };
+    /// Get active announcements for user
+    pub async fn get_active_for_user(
+        db: &DatabaseConnection,
+        user_id: i64,
+    ) -> Result<Vec<AnnouncementResponse>> {
+        let now = Utc::now();
+        let announcements = announcements::Entity::find()
+            .filter(announcements::Column::Status.eq("active"))
+            .filter(
+                Condition::any()
+                    .add(announcements::Column::StartsAt.is_null())
+                    .add(announcements::Column::StartsAt.lte(now))
+            )
+            .filter(
+                Condition::any()
+                    .add(announcements::Column::EndsAt.is_null())
+                    .add(announcements::Column::EndsAt.gte(now))
+            )
+            .order_by_desc(announcements::Column::CreatedAt)
+            .all(db)
+            .await?;
 
-        assert!(updates.title.is_some());
-        assert!(updates.content.is_none());
-        assert!(updates.is_pinned.unwrap());
-    }
+        // Check which ones are read
+        let announcement_ids: Vec<i64> = announcements.iter().map(|a| a.id).collect();
+        let reads = announcement_reads::Entity::find()
+            .filter(announcement_reads::Column::UserId.eq(user_id))
+            .filter(announcement_reads::Column::AnnouncementId.is_in(announcement_ids))
+            .all(db)
+            .await?;
 
-    #[test]
-    fn test_announcement_priority() {
-        let mut announcements = vec![
-            (1, "普通公告"),
-            (5, "重要公告"),
-            (10, "紧急公告"),
-            (3, "一般公告"),
-        ];
+        let read_ids: std::collections::HashSet<i64> = reads.iter().map(|r| r.announcement_id).collect();
 
-        announcements.sort_by(|a, b| b.0.cmp(&a.0));
+        let responses: Vec<AnnouncementResponse> = announcements
+            .into_iter()
+            .map(|a| {
+                let mut response: AnnouncementResponse = a.into();
+                response.is_read = Some(read_ids.contains(&response.id));
+                response
+            })
+            .collect();
 
-        assert_eq!(announcements[0].1, "紧急公告");
-        assert_eq!(announcements[1].1, "重要公告");
+        Ok(responses)
     }
 }

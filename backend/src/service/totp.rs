@@ -1,8 +1,10 @@
 //! TOTP 两步验证服务
+
 //!
 //! 兼容 Google Authenticator / Authy / Microsoft Authenticator
 
-use anyhow::{bail, Result};
+#![allow(dead_code)]
+use anyhow::Result;
 use base64::Engine;
 use qrcode::QrCode;
 use rand::RngCore;
@@ -219,9 +221,9 @@ fn base32_decode(s: &str) -> Option<Vec<u8>> {
     let mut bits_count = 0;
 
     for c in s.chars() {
-        let val = if c >= 'A' && c <= 'Z' {
+        let val = if c.is_ascii_uppercase() {
             (c as u8) - b'A'
-        } else if c >= '2' && c <= '7' {
+        } else if ('2'..='7').contains(&c) {
             (c as u8) - b'2' + 26
         } else {
             return None;

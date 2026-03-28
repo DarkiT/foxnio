@@ -6,6 +6,10 @@
 //! - 多通道告警发送
 //! - 告警历史记录
 //! - 告警静默机制
+//!
+//! 预留功能：告警系统（扩展功能）
+
+#![allow(dead_code)]
 
 pub mod channels;
 pub mod history;
@@ -19,8 +23,10 @@ use std::collections::HashMap;
 /// 告警级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum AlertLevel {
     /// 信息级别 - 一般性通知
+    #[default]
     Info,
     /// 警告级别 - 需要关注但不紧急
     Warning,
@@ -28,12 +34,6 @@ pub enum AlertLevel {
     Error,
     /// 严重级别 - 系统关键故障
     Critical,
-}
-
-impl Default for AlertLevel {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 impl AlertLevel {
@@ -48,7 +48,7 @@ impl AlertLevel {
     }
 
     /// 从字符串解析告警级别
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "info" => Some(Self::Info),
             "warning" => Some(Self::Warning),
@@ -132,12 +132,6 @@ impl Alert {
         self
     }
 
-    /// 设置时间戳
-    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
-        self.timestamp = timestamp;
-        self
-    }
-
     /// 格式化为简洁字符串
     pub fn to_summary(&self) -> String {
         format!(
@@ -172,18 +166,6 @@ impl Alert {
             self.message
         )
     }
-
-    /// 转换为 JSON 格式
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "level": self.level.as_str(),
-            "title": self.title,
-            "message": self.message,
-            "source": self.source,
-            "timestamp": self.timestamp.to_rfc3339(),
-            "labels": self.labels,
-        })
-    }
 }
 
 /// 告警通道类型
@@ -213,7 +195,7 @@ impl AlertChannelType {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "email" => Some(Self::Email),
             "webhook" => Some(Self::Webhook),
@@ -233,6 +215,7 @@ impl std::fmt::Display for AlertChannelType {
 
 /// 告警发送结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
+
 pub struct AlertSendResult {
     /// 是否成功
     pub success: bool,
@@ -262,27 +245,6 @@ impl AlertSendResult {
             timestamp: Utc::now(),
         }
     }
-}
-
-/// 告警通道配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlertChannelConfig {
-    /// 通道 ID
-    pub id: String,
-    /// 通道类型
-    #[serde(rename = "type")]
-    pub channel_type: AlertChannelType,
-    /// 通道名称
-    pub name: String,
-    /// 是否启用
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-    /// 通道特定配置（JSON 格式）
-    pub config: serde_json::Value,
-}
-
-fn default_enabled() -> bool {
-    true
 }
 
 /// 静默规则
@@ -342,7 +304,7 @@ mod tests {
     #[test]
     fn test_alert_level() {
         assert_eq!(AlertLevel::Info.as_str(), "info");
-        assert_eq!(AlertLevel::from_str("warning"), Some(AlertLevel::Warning));
+        assert_eq!(AlertLevel::parse("warning"), Some(AlertLevel::Warning));
         assert!(AlertLevel::Critical.is_high_priority());
         assert!(!AlertLevel::Info.is_high_priority());
     }
@@ -393,15 +355,15 @@ mod tests {
     #[test]
     fn test_alert_channel_type() {
         assert_eq!(
-            AlertChannelType::from_str("feishu"),
+            AlertChannelType::parse("feishu"),
             Some(AlertChannelType::Feishu)
         );
         assert_eq!(
-            AlertChannelType::from_str("lark"),
+            AlertChannelType::parse("lark"),
             Some(AlertChannelType::Feishu)
         );
         assert_eq!(
-            AlertChannelType::from_str("dingding"),
+            AlertChannelType::parse("dingding"),
             Some(AlertChannelType::DingTalk)
         );
     }

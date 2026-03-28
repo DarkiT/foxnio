@@ -2,25 +2,48 @@
 
 use async_trait::async_trait;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 
 use super::{AlertChannel, AlertSendResult, FeishuChannelConfig};
 use crate::alert::{Alert, AlertChannelType};
+
+/// 飞书消息格式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeishuMessageFormat {
+    /// 交互式卡片（默认）
+    #[default]
+    Interactive,
+    /// 富文本消息
+    Post,
+    /// 纯文本消息
+    Text,
+}
 
 /// 飞书告警通道
 pub struct FeishuChannel {
     config: FeishuChannelConfig,
     client: Client,
     name: String,
+    /// 消息格式
+    format: FeishuMessageFormat,
 }
 
 impl FeishuChannel {
+    /// 创建新的飞书通道（使用默认交互式卡片格式）
     pub fn new(config: FeishuChannelConfig) -> Self {
+        Self::with_format(config, FeishuMessageFormat::default())
+    }
+
+    /// 创建指定消息格式的飞书通道
+    pub fn with_format(config: FeishuChannelConfig, format: FeishuMessageFormat) -> Self {
         let name = "Feishu".to_string();
         let client = Client::new();
         Self {
             config,
             client,
             name,
+            format,
         }
     }
 
@@ -34,7 +57,7 @@ impl FeishuChannel {
         };
 
         // 构建标签内容
-        let tags_content = if alert.labels.is_empty() {
+        let _tags_content = if alert.labels.is_empty() {
             String::new()
         } else {
             let tags: Vec<String> = alert
@@ -55,7 +78,7 @@ impl FeishuChannel {
         };
 
         // 构建 @ 用户内容
-        let at_content = if self.config.at_all {
+        let _at_content = if self.config.at_all {
             r#",{ "tag": "div", "text": { "tag": "lark_md", "content": "<at user_id=\"all\">所有人</at>" } }"#.to_string()
         } else if !self.config.at_users.is_empty() {
             let ats: Vec<String> = self
@@ -130,9 +153,9 @@ impl FeishuChannel {
         })
     }
 
-    /// 构建富文本消息
-    fn build_post_message(&self, alert: &Alert) -> serde_json::Value {
-        let level_color = match alert.level {
+    /// 构建富文本消息（备选格式）
+    pub fn build_post_message(&self, alert: &Alert) -> serde_json::Value {
+        let _level_color = match alert.level {
             crate::alert::AlertLevel::Info => "blue",
             crate::alert::AlertLevel::Warning => "yellow",
             crate::alert::AlertLevel::Error => "red",
@@ -197,8 +220,8 @@ impl FeishuChannel {
         })
     }
 
-    /// 构建文本消息（简单格式）
-    fn build_text_message(&self, alert: &Alert) -> serde_json::Value {
+    /// 构建文本消息（备选格式）
+    pub fn build_text_message(&self, alert: &Alert) -> serde_json::Value {
         let mut text = alert.to_detailed();
 
         if self.config.at_all {
@@ -221,7 +244,11 @@ impl FeishuChannel {
 #[async_trait]
 impl AlertChannel for FeishuChannel {
     async fn send(&self, alert: &Alert) -> AlertSendResult {
-        let body = self.build_interactive_card(alert);
+        let body = match self.format {
+            FeishuMessageFormat::Interactive => self.build_interactive_card(alert),
+            FeishuMessageFormat::Post => self.build_post_message(alert),
+            FeishuMessageFormat::Text => self.build_text_message(alert),
+        };
 
         match self
             .client
@@ -276,7 +303,6 @@ struct FeishuResponse {
 mod tests {
     use super::*;
     use crate::alert::AlertLevel;
-    use std::collections::HashMap;
 
     fn create_test_config() -> FeishuChannelConfig {
         FeishuChannelConfig {

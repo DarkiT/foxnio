@@ -7,12 +7,12 @@ use std::time::Duration;
 /// 模拟 Redis 存储
 #[derive(Debug, Default)]
 struct RedisStore {
-    data: HashMap<String, (String, Option<i64>)>, // key -> (value, expiration_timestamp)
+    data: HashMap<String, (String, Option<i64>)>, // key -> (value, expiration_timestamp_ms)
 }
 
 impl RedisStore {
     fn cleanup_expired(&mut self) {
-        let now = chrono::Utc::now().timestamp();
+        let now = chrono::Utc::now().timestamp_millis();
         self.data
             .retain(|_, (_, exp)| exp.map(|e| e > now).unwrap_or(true));
     }
@@ -40,7 +40,7 @@ impl MockRedisPool {
     /// 设置键值（带 TTL）
     pub async fn set(&self, key: &str, value: &str, ttl: Option<Duration>) -> anyhow::Result<()> {
         let mut store = self.store.lock().unwrap();
-        let exp = ttl.map(|d| chrono::Utc::now().timestamp() + d.as_secs() as i64);
+        let exp = ttl.map(|d| chrono::Utc::now().timestamp_millis() + d.as_millis() as i64);
         store.data.insert(key.to_string(), (value.to_string(), exp));
         Ok(())
     }
@@ -69,7 +69,7 @@ impl MockRedisPool {
     pub async fn expire(&self, key: &str, ttl: Duration) -> anyhow::Result<bool> {
         let mut store = self.store.lock().unwrap();
         if let Some((_, ref mut exp)) = store.data.get_mut(key) {
-            *exp = Some(chrono::Utc::now().timestamp() + ttl.as_secs() as i64);
+            *exp = Some(chrono::Utc::now().timestamp_millis() + ttl.as_millis() as i64);
             Ok(true)
         } else {
             Ok(false)
@@ -81,8 +81,10 @@ impl MockRedisPool {
         let store = self.store.lock().unwrap();
         if let Some((_, exp)) = store.data.get(key) {
             if let Some(e) = exp {
-                let remaining = e - chrono::Utc::now().timestamp();
-                Ok(remaining.max(0))
+                let remaining_ms = e - chrono::Utc::now().timestamp_millis();
+                // 返回秒数（向上取整）
+                let remaining_secs = (remaining_ms + 999) / 1000;
+                Ok(remaining_secs.max(0))
             } else {
                 Ok(-1) // 无过期时间
             }

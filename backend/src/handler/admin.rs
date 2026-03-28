@@ -2,6 +2,7 @@
 //!
 //! 使用角色权限系统进行访问控制
 
+#![allow(dead_code)]
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -12,7 +13,7 @@ use crate::gateway::middleware::permission::check_permission;
 use crate::gateway::SharedState;
 use crate::service::permission::{Permission, PermissionService};
 use crate::service::user::Claims;
-use crate::service::{AccountService, BillingService, UserService};
+use crate::service::{LegacyAccountService as AccountService, LegacyBillingService as BillingService, UserService};
 
 // ============ 用户管理 API ============
 
@@ -186,10 +187,10 @@ pub async fn get_user(
 
 /// 更新用户 - 需要 UserWrite 权限
 pub async fn update_user(
-    Extension(state): Extension<SharedState>,
+    Extension(_state): Extension<SharedState>,
     Extension(claims): Extension<Claims>,
     Path(id): Path<String>,
-    Json(req): Json<UpdateUserRequest>,
+    Json(_req): Json<UpdateUserRequest>,
 ) -> Result<Json<Value>, ApiError> {
     // 权限检查
     check_permission(&claims, Permission::UserWrite)
@@ -210,7 +211,7 @@ pub async fn update_user(
 
 /// 删除用户 - 需要 UserDelete 权限
 pub async fn delete_user(
-    Extension(state): Extension<SharedState>,
+    Extension(_state): Extension<SharedState>,
     Extension(claims): Extension<Claims>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
@@ -219,7 +220,7 @@ pub async fn delete_user(
         .await
         .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
 
-    let user_id =
+    let _user_id =
         Uuid::parse_str(&id).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     // 不能删除自己
@@ -415,7 +416,7 @@ pub async fn delete_account(
 
 /// 列出所有 API Keys - 需要 ApiKeyRead 权限
 pub async fn list_apikeys(
-    Extension(state): Extension<SharedState>,
+    Extension(_state): Extension<SharedState>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Value>, ApiError> {
     // 权限检查

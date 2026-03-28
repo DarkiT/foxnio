@@ -1,12 +1,14 @@
 //! 集成测试
 
-use foxnio::{Config, Gateway};
+use foxnio::Config;
 
 #[tokio::test]
 async fn test_config_default() {
     let config = Config::default();
 
-    assert_eq!(config.server.port, 8080);
+    // ServerConfig now uses http2/tls/http2_client fields
+    // Check that config is valid
+    assert!(config.server.http2.enabled);
     assert_eq!(config.database.dbname, "foxnio");
     assert_eq!(config.gateway.api_key_prefix, "sk-");
 }

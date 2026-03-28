@@ -22,11 +22,11 @@ use std::time::Duration;
 #[test]
 fn test_alert_level_conversion() {
     // 测试字符串转换
-    assert_eq!(AlertLevel::from_str("info"), Some(AlertLevel::Info));
-    assert_eq!(AlertLevel::from_str("WARNING"), Some(AlertLevel::Warning));
-    assert_eq!(AlertLevel::from_str("Error"), Some(AlertLevel::Error));
-    assert_eq!(AlertLevel::from_str("critical"), Some(AlertLevel::Critical));
-    assert_eq!(AlertLevel::from_str("invalid"), None);
+    assert_eq!(AlertLevel::parse("info"), Some(AlertLevel::Info));
+    assert_eq!(AlertLevel::parse("WARNING"), Some(AlertLevel::Warning));
+    assert_eq!(AlertLevel::parse("Error"), Some(AlertLevel::Error));
+    assert_eq!(AlertLevel::parse("critical"), Some(AlertLevel::Critical));
+    assert_eq!(AlertLevel::parse("invalid"), None);
 
     // 测试显示
     assert_eq!(AlertLevel::Info.as_str(), "info");
@@ -67,7 +67,7 @@ fn test_alert_formatting() {
     assert!(detailed.contains("数据库连接失败"));
     assert!(detailed.contains("来源: foxnio"));
 
-    let json = alert.to_json();
+    let json = serde_json::to_value(&alert).unwrap();
     assert_eq!(json["level"], "error");
     assert_eq!(json["title"], "系统错误");
 }
@@ -75,31 +75,31 @@ fn test_alert_formatting() {
 #[test]
 fn test_alert_channel_type() {
     assert_eq!(
-        AlertChannelType::from_str("email"),
+        AlertChannelType::parse("email"),
         Some(AlertChannelType::Email)
     );
     assert_eq!(
-        AlertChannelType::from_str("webhook"),
+        AlertChannelType::parse("webhook"),
         Some(AlertChannelType::Webhook)
     );
     assert_eq!(
-        AlertChannelType::from_str("dingtalk"),
+        AlertChannelType::parse("dingtalk"),
         Some(AlertChannelType::DingTalk)
     );
     assert_eq!(
-        AlertChannelType::from_str("dingding"),
+        AlertChannelType::parse("dingding"),
         Some(AlertChannelType::DingTalk)
     );
     assert_eq!(
-        AlertChannelType::from_str("feishu"),
+        AlertChannelType::parse("feishu"),
         Some(AlertChannelType::Feishu)
     );
     assert_eq!(
-        AlertChannelType::from_str("lark"),
+        AlertChannelType::parse("lark"),
         Some(AlertChannelType::Feishu)
     );
     assert_eq!(
-        AlertChannelType::from_str("slack"),
+        AlertChannelType::parse("slack"),
         Some(AlertChannelType::Slack)
     );
 }
@@ -807,8 +807,12 @@ fn test_condition_boundary_values() {
     assert!(condition.evaluate(&MetricsSnapshot::new().with_error_rate(0.1)));
     assert!(!condition.evaluate(&MetricsSnapshot::new().with_error_rate(0.0)));
 
-    let condition = AlertCondition::ConnectionCountBelow { threshold: 0 };
+    // ConnectionCountBelow 使用 < 比较，所以 threshold=0 时，只有 active_connections < 0 才为 true
+    // 由于 active_connections 不可能为负数，所以 threshold=0 时永远为 false
+    // 改用 threshold=1 来测试连接数为 0 的情况
+    let condition = AlertCondition::ConnectionCountBelow { threshold: 1 };
     assert!(condition.evaluate(&MetricsSnapshot::new().with_connections(0)));
+    assert!(!condition.evaluate(&MetricsSnapshot::new().with_connections(1)));
 }
 
 #[test]
@@ -829,7 +833,7 @@ fn test_alert_empty_labels() {
     let alert = Alert::new(AlertLevel::Info, "标题", "消息");
     assert!(alert.labels.is_empty());
 
-    let json = alert.to_json();
+    let json = serde_json::to_value(&alert).unwrap();
     assert!(json["labels"].as_object().unwrap().is_empty());
 }
 

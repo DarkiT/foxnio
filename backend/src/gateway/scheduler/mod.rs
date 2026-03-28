@@ -1,6 +1,10 @@
 //! 智能调度器模块
 //!
 //! 提供 6 种调度策略，支持实时指标收集和成本优化
+//!
+//! 预留功能：智能调度器（扩展功能）
+
+#![allow(dead_code)]
 
 pub mod cost_optimizer;
 pub mod metrics;
@@ -14,16 +18,18 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-pub use cost_optimizer::{BudgetSummary, CostConfig, CostOptimizer, OptimizationSuggestion};
-pub use metrics::{
-    AccountMetrics, AccountMetricsSnapshot, SchedulerMetrics, SchedulerMetricsSnapshot,
-};
+#[allow(unused_imports)]
+pub use cost_optimizer::{BudgetSummary, CostConfig, CostOptimizer};
+#[allow(unused_imports)]
+pub use metrics::{AccountMetrics, SchedulerMetrics};
 
 /// 调度策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ScheduleStrategy {
     /// 轮询：简单轮流选择
+    #[default]
     RoundRobin,
     /// 最少连接：选择活跃连接最少的账号
     LeastConnection,
@@ -35,12 +41,6 @@ pub enum ScheduleStrategy {
     LatencyOptimized,
     /// 自适应：根据实时指标动态调整
     Adaptive,
-}
-
-impl Default for ScheduleStrategy {
-    fn default() -> Self {
-        Self::RoundRobin
-    }
 }
 
 impl std::fmt::Display for ScheduleStrategy {
@@ -86,7 +86,7 @@ impl AccountStatus {
 }
 
 /// 调度上下文
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ScheduleContext {
     pub model: String,
     pub user_id: Option<Uuid>,
@@ -94,19 +94,6 @@ pub struct ScheduleContext {
     pub priority: i32,
     pub max_latency_ms: Option<u64>,
     pub cost_sensitive: bool,
-}
-
-impl Default for ScheduleContext {
-    fn default() -> Self {
-        Self {
-            model: String::new(),
-            user_id: None,
-            session_id: None,
-            priority: 0,
-            max_latency_ms: None,
-            cost_sensitive: false,
-        }
-    }
 }
 
 /// 调度结果
@@ -845,6 +832,11 @@ mod tests {
             .add_account(create_test_account(id2, "account-2", 1))
             .await;
 
+        // 模拟第一个账号延迟更高
+        let metrics1 = scheduler.metrics.get_or_create_account_metrics(id1).await;
+        metrics1.record_request_start();
+        metrics1.record_request_success(200, None).await;
+
         // 模拟第二个账号延迟更低
         let metrics2 = scheduler.metrics.get_or_create_account_metrics(id2).await;
         metrics2.record_request_start();
@@ -912,7 +904,7 @@ mod tests {
 
         // 此时账号应该不可选
         let ctx = ScheduleContext::default();
-        let result = scheduler.select(&ctx).await;
+        let _result = scheduler.select(&ctx).await;
 
         // 因为只有一个账号且在冷却中，应该返回 None
         // 注意：实际实现中 is_in_cooldown_sync 可能返回 false
