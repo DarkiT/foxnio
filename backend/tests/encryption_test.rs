@@ -6,6 +6,9 @@
 //! - 性能测试
 //! - 与实体集成
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use foxnio::utils::encryption_global::{
     init_encryption_service_with_key, is_encryption_initialized,

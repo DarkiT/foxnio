@@ -9,6 +9,9 @@
 //! - 故障转移
 //! - 性能测试
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
