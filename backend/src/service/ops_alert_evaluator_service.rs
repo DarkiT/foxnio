@@ -451,7 +451,7 @@ mod tests {
     fn test_email_rate_limiter() {
         let mut limiter = EmailRateLimiter::new(5);
 
-        for i in 0..5 {
+        for _ in 0..5 {
             assert!(limiter.check_and_increment());
         }
 

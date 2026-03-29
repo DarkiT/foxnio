@@ -141,7 +141,6 @@ impl SoraGenerationService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_generation_creation() {
