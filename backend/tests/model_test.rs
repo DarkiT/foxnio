@@ -2,6 +2,9 @@
 //!
 //! 测试模型路由、降级和参数映射功能
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use std::collections::HashMap;
 
 // 模拟模型定义（与实际代码保持一致）

@@ -1,5 +1,9 @@
 //! 压缩中间件测试
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(clippy::useless_vec)]
+
 // 测试各种大小内容的压缩
 #[test]
 fn test_various_sizes_compression() {
