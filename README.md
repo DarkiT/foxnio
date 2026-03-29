@@ -37,14 +37,46 @@ curl http://localhost:8080/v1/chat/completions \
 
 ## 支持的服务商
 
-| 服务商 | 模型示例 |
-|--------|----------|
-| OpenAI | gpt-4o, gpt-4-turbo, gpt-3.5-turbo |
-| Anthropic | claude-3.5-sonnet, claude-3-opus |
-| Google | gemini-1.5-pro, gemini-1.5-flash |
-| DeepSeek | deepseek-chat, deepseek-coder |
-| Mistral | mistral-large, mistral-medium |
-| Cohere | command-r, command-r-plus |
+FoxNIO 支持 6 大主流 AI 服务商，模型配置完全**动态管理**：
+
+| 服务商 | 状态 | 特性 |
+|--------|------|------|
+| OpenAI | ✅ | 支持所有 GPT 系列模型 |
+| Anthropic | ✅ | 支持 Claude 全系列 |
+| Google (Gemini) | ✅ | 原生 API 支持 |
+| DeepSeek | ✅ | 支持最新 V3/Coder |
+| Mistral | ✅ | 支持 Mistral 全系列 |
+| Cohere | ✅ | 支持 Command 系列 |
+
+### 动态模型管理
+
+- **数据库持久化**: 模型配置存储在数据库中，无需重启即可更新
+- **热加载**: 通过 API 实时更新模型配置
+- **自动同步**: 支持从各服务商自动同步最新模型（计划中）
+- **模型路由**: 支持别名映射、自动降级、负载均衡
+
+**查看当前模型列表**:
+```bash
+curl http://localhost:8080/v1/models \
+  -H "Authorization: Bearer foxnio-your-key"
+```
+
+**管理模型配置** (需要管理员权限):
+```bash
+# 列出所有模型
+curl http://localhost:8080/api/v1/admin/models \
+  -H "Authorization: Bearer <admin-token>"
+
+# 导入默认模型
+curl -X POST http://localhost:8080/api/v1/admin/models/import-defaults \
+  -H "Authorization: Bearer <admin-token>"
+
+# 热加载模型配置
+curl -X POST http://localhost:8080/api/v1/admin/models/reload \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+详见 [动态模型配置文档](backend/docs/DYNAMIC_MODEL_IMPLEMENTATION.md)
 
 ## 核心功能
 
