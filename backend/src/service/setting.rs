@@ -22,6 +22,19 @@ pub enum SettingCategory {
     Custom(String),
 }
 
+impl SettingCategory {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SettingCategory::System => "system",
+            SettingCategory::Gateway => "gateway",
+            SettingCategory::Billing => "billing",
+            SettingCategory::Security => "security",
+            SettingCategory::RateLimit => "rate_limit",
+            SettingCategory::Custom(_) => "custom",
+        }
+    }
+}
+
 impl Setting {
     pub fn new(key: String, value: String, _category: SettingCategory) -> Self {
         Self {

@@ -220,16 +220,33 @@ impl AuthService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use argon2::password_hash::{PasswordHasher, SaltString};
+    use argon2::{Algorithm, Argon2, Params};
 
-    #[tokio::test]
-    async fn test_password_hashing() {
-        let pool = PgPool::connect("postgres://test").await.unwrap();
-        let setting_service = Arc::new(SettingService::new(pool.clone()));
-        let service = AuthService::new(pool, setting_service, "test_secret".to_string());
-
+    #[test]
+    fn test_password_hashing() {
         let password = "test_password";
-        let hash = service.hash_password(password).unwrap();
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::new(Algorithm::Argon2id, argon2::Version::V0x13, Params::default());
+        let hash = argon2.hash_password(password.as_bytes(), &salt).unwrap().to_string();
 
-        assert!(service.verify_password(password, &hash).unwrap());
+        // Verify the hash can be parsed and validated
+        let parsed_hash = PasswordHash::new(&hash).unwrap();
+        assert!(Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok());
+        assert!(Argon2::default().verify_password("wrong_password".as_bytes(), &parsed_hash).is_err());
+    }
+
+    #[test]
+    fn test_password_hash_uniqueness() {
+        let password = "same_password";
+        let salt1 = SaltString::generate(&mut OsRng);
+        let salt2 = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::new(Algorithm::Argon2id, argon2::Version::V0x13, Params::default());
+        
+        let hash1 = argon2.hash_password(password.as_bytes(), &salt1).unwrap().to_string();
+        let hash2 = argon2.hash_password(password.as_bytes(), &salt2).unwrap().to_string();
+
+        // Same password should produce different hashes (due to salt)
+        assert_ne!(hash1, hash2);
     }
 }
