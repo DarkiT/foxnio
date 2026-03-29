@@ -1,6 +1,7 @@
 //! Entity 测试
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
 
     #[test]
