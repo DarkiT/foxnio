@@ -119,7 +119,6 @@ impl SubscriptionMaintenanceQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_queue_operations() {

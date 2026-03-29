@@ -108,7 +108,6 @@ impl AccountService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_account_service() {

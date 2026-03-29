@@ -101,7 +101,6 @@ impl BillingService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_billing_service() {

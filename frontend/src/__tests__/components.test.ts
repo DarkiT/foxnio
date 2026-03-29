@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte/svelte5';
+import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Dashboard from '../routes/admin/+page.svelte';
 import ApiKeys from '../routes/apikeys/+page.svelte';

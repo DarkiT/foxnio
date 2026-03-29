@@ -122,7 +122,6 @@ impl OpenAIPreviousResponseId {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_response_id_creation() {

@@ -68,7 +68,6 @@ impl SubscriptionExpiryService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_expiry_service() {
