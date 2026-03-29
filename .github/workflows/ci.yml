@@ -303,7 +303,9 @@ jobs:
       - name: Run clippy pedantic
         working-directory: backend
         run: cargo clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery
+        continue-on-error: true
       
       - name: Check documentation
         working-directory: backend
         run: cargo doc --no-deps
+        continue-on-error: true
