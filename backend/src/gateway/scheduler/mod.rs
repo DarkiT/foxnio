@@ -2,12 +2,26 @@
 //!
 //! 提供 6 种调度策略，支持实时指标收集和成本优化
 //!
+//! 核心功能：
+//! - 6 种调度策略（轮询、最少连接、加权响应、成本优化、延迟优化、自适应）
+//! - 等待队列机制（并发控制、超时、公平调度）
+//! - 实时指标收集
+//! - 成本优化
+//!
 //! 预留功能：智能调度器（扩展功能）
 
 #![allow(dead_code)]
 
 pub mod cost_optimizer;
+pub mod load_balancer;
 pub mod metrics;
+
+// 重导出等待队列模块
+pub use crate::gateway::waiting_queue::{
+    AllocationSlot, GlobalQueueStats, ModelWaitingQueue, QueueError, QueueMetrics,
+    QueueMetricsSnapshot, QueueStats, WaitingQueue, WaitingQueueConfig, WaitingRequest,
+    WaitingRequestInfo,
+};
 
 use chrono::{DateTime, Utc};
 use rand::Rng;
@@ -20,6 +34,11 @@ use uuid::Uuid;
 
 #[allow(unused_imports)]
 pub use cost_optimizer::{BudgetSummary, CostConfig, CostOptimizer};
+#[allow(unused_imports)]
+pub use load_balancer::{
+    AccountLoadInfo, LoadAwareScheduler, LoadAwareSchedulerConfig, ScheduleDecision,
+    ScheduleLayer, SchedulerMetricsSnapshot, SchedulerScoreWeights,
+};
 #[allow(unused_imports)]
 pub use metrics::{AccountMetrics, SchedulerMetrics};
 
@@ -94,6 +113,10 @@ pub struct ScheduleContext {
     pub priority: i32,
     pub max_latency_ms: Option<u64>,
     pub cost_sensitive: bool,
+    /// 前次响应 ID（用于粘性调度）
+    pub previous_response_id: Option<String>,
+    /// 排除的账号 ID 列表
+    pub excluded_ids: Vec<i64>,
 }
 
 /// 调度结果
@@ -132,6 +155,8 @@ pub struct SchedulerConfig {
     pub min_available_accounts: usize,
     /// 启用成本优化
     pub enable_cost_optimization: bool,
+    /// 等待队列配置
+    pub waiting_queue: WaitingQueueConfig,
 }
 
 impl Default for SchedulerConfig {
@@ -144,6 +169,7 @@ impl Default for SchedulerConfig {
             adaptive_update_interval_secs: 10,
             min_available_accounts: 1,
             enable_cost_optimization: true,
+            waiting_queue: WaitingQueueConfig::default(),
         }
     }
 }
@@ -168,11 +194,18 @@ pub struct Scheduler {
     account_cooldown: RwLock<HashMap<Uuid, DateTime<Utc>>>,
     /// 自适应权重
     adaptive_weights: RwLock<HashMap<Uuid, f64>>,
+    /// 等待队列
+    waiting_queue: Arc<WaitingQueue>,
+    /// 按模型的等待队列
+    model_waiting_queue: Arc<ModelWaitingQueue>,
 }
 
 impl Scheduler {
     /// 创建新调度器
     pub fn new(config: SchedulerConfig) -> Self {
+        let waiting_queue = Arc::new(WaitingQueue::new(config.waiting_queue.clone()));
+        let model_waiting_queue = Arc::new(ModelWaitingQueue::new(config.waiting_queue.clone()));
+
         Self {
             strategy: RwLock::new(config.default_strategy),
             accounts: RwLock::new(Vec::new()),
@@ -183,11 +216,16 @@ impl Scheduler {
             sticky_sessions: RwLock::new(HashMap::new()),
             account_cooldown: RwLock::new(HashMap::new()),
             adaptive_weights: RwLock::new(HashMap::new()),
+            waiting_queue,
+            model_waiting_queue,
         }
     }
 
     /// 使用现有指标创建调度器
     pub fn with_metrics(config: SchedulerConfig, metrics: Arc<SchedulerMetrics>) -> Self {
+        let waiting_queue = Arc::new(WaitingQueue::new(config.waiting_queue.clone()));
+        let model_waiting_queue = Arc::new(ModelWaitingQueue::new(config.waiting_queue.clone()));
+
         Self {
             strategy: RwLock::new(config.default_strategy),
             accounts: RwLock::new(Vec::new()),
@@ -198,6 +236,30 @@ impl Scheduler {
             sticky_sessions: RwLock::new(HashMap::new()),
             account_cooldown: RwLock::new(HashMap::new()),
             adaptive_weights: RwLock::new(HashMap::new()),
+            waiting_queue,
+            model_waiting_queue,
+        }
+    }
+
+    /// 使用现有指标和等待队列创建调度器
+    pub fn with_metrics_and_queue(
+        config: SchedulerConfig,
+        metrics: Arc<SchedulerMetrics>,
+        waiting_queue: Arc<WaitingQueue>,
+        model_waiting_queue: Arc<ModelWaitingQueue>,
+    ) -> Self {
+        Self {
+            strategy: RwLock::new(config.default_strategy),
+            accounts: RwLock::new(Vec::new()),
+            metrics,
+            cost_optimizer: Arc::new(CostOptimizer::new(CostConfig::default())),
+            config,
+            round_robin_index: AtomicUsize::new(0),
+            sticky_sessions: RwLock::new(HashMap::new()),
+            account_cooldown: RwLock::new(HashMap::new()),
+            adaptive_weights: RwLock::new(HashMap::new()),
+            waiting_queue,
+            model_waiting_queue,
         }
     }
 
@@ -678,6 +740,8 @@ impl Scheduler {
         let cooldown = self.account_cooldown.read().await;
         let cooldown_count = cooldown.len();
 
+        let queue_stats = self.waiting_queue.stats().await;
+
         SchedulerStats {
             total_accounts: total_count,
             active_accounts: active_count,
@@ -685,6 +749,7 @@ impl Scheduler {
             sticky_sessions: sticky_count,
             accounts_in_cooldown: cooldown_count,
             current_strategy: *self.strategy.read().await,
+            queue: Some(queue_stats),
         }
     }
 
@@ -705,6 +770,100 @@ impl Scheduler {
 
         cooldown.retain(|_, time| (now - *time).num_seconds() < self.config.account_cooldown_secs);
     }
+
+    // ============ 等待队列接口 ============
+
+    /// 获取等待队列
+    pub fn get_waiting_queue(&self) -> Arc<WaitingQueue> {
+        Arc::clone(&self.waiting_queue)
+    }
+
+    /// 获取模型等待队列
+    pub fn get_model_waiting_queue(&self) -> Arc<ModelWaitingQueue> {
+        Arc::clone(&self.model_waiting_queue)
+    }
+
+    /// 尝试获取执行槽位（非阻塞）
+    pub async fn try_acquire_slot(&self) -> Option<AllocationSlot> {
+        self.waiting_queue.try_acquire().await
+    }
+
+    /// 请求执行槽位（带等待）
+    pub async fn acquire_slot(
+        &self,
+        user_id: Uuid,
+        model: &str,
+        priority: i32,
+        timeout_ms: Option<u64>,
+    ) -> Result<AllocationSlot, QueueError> {
+        self.model_waiting_queue
+            .acquire(model, user_id, priority, timeout_ms)
+            .await
+    }
+
+    /// 释放执行槽位
+    pub async fn release_slot(&self, model: &str, slot: AllocationSlot) {
+        self.model_waiting_queue.release(model, slot).await;
+    }
+
+    /// 获取队列统计
+    pub async fn get_queue_stats(&self) -> QueueStats {
+        self.waiting_queue.stats().await
+    }
+
+    /// 获取全局队列统计
+    pub async fn get_global_queue_stats(&self) -> GlobalQueueStats {
+        self.model_waiting_queue.global_stats().await
+    }
+
+    /// 获取等待中的请求列表
+    pub async fn get_pending_requests(&self) -> Vec<WaitingRequestInfo> {
+        self.waiting_queue.pending_requests().await
+    }
+
+    /// 清理队列超时请求
+    pub async fn cleanup_queue_timeouts(&self) -> usize {
+        self.waiting_queue.cleanup_timeouts().await
+    }
+
+    /// 带等待队列的选择
+    ///
+    /// 如果当前无可用账号，会等待直到有账号可用或超时
+    pub async fn select_with_queue(
+        &self,
+        ctx: &ScheduleContext,
+        timeout_ms: Option<u64>,
+    ) -> Option<ScheduleResult> {
+        // 首先尝试直接选择
+        if let Some(result) = self.select(ctx).await {
+            return Some(result);
+        }
+
+        // 无可用账号，尝试获取槽位等待
+        let user_id = ctx.user_id.unwrap_or_else(Uuid::nil);
+        let model = ctx.model.clone();
+        let priority = ctx.priority;
+        let timeout = timeout_ms.unwrap_or(self.config.waiting_queue.default_timeout_ms);
+
+        // 检查队列是否已满
+        if self.waiting_queue.len().await >= self.config.waiting_queue.max_queue_size {
+            return None;
+        }
+
+        // 获取槽位
+        match self.acquire_slot(user_id, &model, priority, Some(timeout)).await {
+            Ok(_slot) => {
+                // 有槽位了，再次尝试选择
+                self.select(ctx).await
+            }
+            Err(_) => None,
+        }
+    }
+
+    /// 设置模型并发限制
+    pub async fn set_model_concurrent_limit(&self, model: String, limit: usize) {
+        self.model_waiting_queue.set_model_limit(model, limit).await;
+    }
 }
 
 /// 调度器统计
@@ -716,6 +875,8 @@ pub struct SchedulerStats {
     pub sticky_sessions: usize,
     pub accounts_in_cooldown: usize,
     pub current_strategy: ScheduleStrategy,
+    /// 队列统计
+    pub queue: Option<QueueStats>,
 }
 
 #[cfg(test)]
