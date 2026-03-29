@@ -131,12 +131,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-03-20
 
 ### Added
-- Initial release
-- Basic gateway functionality
-- User authentication
+
+#### Core Gateway Features
+- Basic gateway functionality with OpenAI compatible API
+- Request forwarding and response handling
+- Docker support for easy deployment
+
+#### Multi-Model Proxy Support
+- OpenAI API integration
+- Anthropic API integration
+- Google AI API integration
+- DeepSeek API integration
+- Mistral API integration
+- Cohere API integration
+- Model routing and alias support
+
+#### Account Scheduling System
+- Multi-account management
+- Intelligent account scheduling
+- Automatic failover mechanism
+- Load balancing across accounts
+
+#### Usage Billing System
+- Usage tracking and statistics
+- Quota management per user
+- Billing history and reports
+- Cost calculation engine
+
+#### OAuth Integration
+- GitHub OAuth support
+- Google OAuth support
+- LinuxDo OAuth support
+- Antigravity OAuth support
+- Secure authentication flow
+
+#### Management Dashboard
+- User management interface
+- Account configuration UI
+- Model management panel
+- Usage statistics dashboard
+- Real-time monitoring interface
+
+#### Security & Infrastructure
+- JWT-based authentication
 - API key management
-- Basic monitoring
-- Docker support
+- Basic monitoring setup
+- PostgreSQL database integration
+- Redis caching layer
 
 ---
 
