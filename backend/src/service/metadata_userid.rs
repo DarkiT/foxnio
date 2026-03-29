@@ -54,16 +54,16 @@ impl MetadataUserIdService {
     pub fn parse(s: &str) -> Result<MetadataUserId, String> {
         let parts: Vec<&str> = s.split(':').collect();
 
-        let user_id = parts.first()
+        let user_id = parts
+            .first()
             .and_then(|s| s.parse::<i64>().ok())
             .ok_or("Invalid user ID")?;
 
         let mut meta = MetadataUserId::new(user_id);
 
-        if parts.len() >= 2
-            && !parts[1].is_empty() {
-                meta.org_id = parts[1].parse::<i64>().ok();
-            }
+        if parts.len() >= 2 && !parts[1].is_empty() {
+            meta.org_id = parts[1].parse::<i64>().ok();
+        }
 
         if parts.len() >= 3 {
             meta.team_id = parts[2].parse::<i64>().ok();

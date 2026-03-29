@@ -53,10 +53,7 @@ impl SettingsView {
                 is_editable: true,
             };
 
-            categories
-                .entry(category)
-                .or_default()
-                .push(setting);
+            categories.entry(category).or_default().push(setting);
         }
 
         let categories: Vec<SettingsCategory> = categories

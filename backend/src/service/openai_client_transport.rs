@@ -224,9 +224,7 @@ impl OpenAIClientTransport {
             TransportError::Timeout(_) => true,
             TransportError::ConnectionError(_) => true,
             TransportError::Http(e) => {
-                e.is_timeout()
-                    || e.is_connect()
-                    || e.status().is_some_and(|s| s.is_server_error())
+                e.is_timeout() || e.is_connect() || e.status().is_some_and(|s| s.is_server_error())
             }
             _ => false,
         }

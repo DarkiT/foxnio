@@ -190,9 +190,7 @@ impl TimingWheelService {
         // 更新统计
         let mut stats = self.stats.write().await;
         stats.completed_tasks += tasks_to_execute.len() as u64;
-        stats.pending_tasks = stats
-            .pending_tasks
-            .saturating_sub(tasks_to_execute.len());
+        stats.pending_tasks = stats.pending_tasks.saturating_sub(tasks_to_execute.len());
         stats.current_tick = current_tick;
 
         tasks_to_execute

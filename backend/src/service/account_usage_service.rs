@@ -40,8 +40,7 @@ pub struct UsageStatistics {
 }
 
 /// 使用量限制配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UsageLimits {
     pub max_requests_per_day: Option<i64>,
     pub max_tokens_per_day: Option<i64>,
@@ -50,7 +49,6 @@ pub struct UsageLimits {
     pub max_tokens_per_hour: Option<i64>,
     pub max_cost_per_hour: Option<f64>,
 }
-
 
 /// 账号使用量服务
 pub struct AccountUsageService {
