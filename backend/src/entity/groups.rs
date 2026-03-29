@@ -95,6 +95,9 @@ pub struct Model {
     pub model_routing: Option<JsonValue>, // HashMap<String, Vec<i64>> -> JSON
     pub model_routing_enabled: bool,
 
+    // 支持的模型系列
+    pub supported_model_scopes: Option<JsonValue>, // Vec<String> -> JSON
+
     // 降级配置
     pub fallback_group_id: Option<i64>,
 
@@ -148,6 +151,56 @@ impl Model {
             .as_ref()
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default()
+    }
+
+    /// 获取支持的模型系列
+    pub fn get_supported_model_scopes(&self) -> Vec<String> {
+        self.supported_model_scopes
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_else(|| vec!["claude".to_string(), "gemini_text".to_string(), "gemini_image".to_string()])
+    }
+
+    /// 根据请求模型获取路由账号 ID 列表
+    /// 返回匹配的优先账号 ID 列表，如果没有匹配规则则返回 None
+    pub fn get_routing_account_ids(&self, requested_model: &str) -> Option<Vec<i64>> {
+        if !self.model_routing_enabled || self.model_routing.is_none() || requested_model.is_empty() {
+            return None;
+        }
+
+        let routing = self.get_model_routing();
+
+        // 1. 精确匹配优先
+        if let Some(account_ids) = routing.get(requested_model) {
+            if !account_ids.is_empty() {
+                return Some(account_ids.clone());
+            }
+        }
+
+        // 2. 通配符匹配（前缀匹配）
+        for (pattern, account_ids) in &routing {
+            if Self::match_model_pattern(pattern, requested_model) && !account_ids.is_empty() {
+                return Some(account_ids.clone());
+            }
+        }
+
+        None
+    }
+
+    /// 检查模型是否匹配模式
+    /// 支持 * 通配符，如 "claude-opus-*" 匹配 "claude-opus-4-20250514"
+    fn match_model_pattern(pattern: &str, model: &str) -> bool {
+        if pattern == model {
+            return true;
+        }
+
+        // 处理 * 通配符（仅支持末尾通配符）
+        if pattern.ends_with('*') {
+            let prefix = &pattern[..pattern.len() - 1];
+            return model.starts_with(prefix);
+        }
+
+        false
     }
 
     /// 检查是否有日限额

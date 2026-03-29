@@ -23,6 +23,7 @@ mod m20240328_000019_create_proxies;
 mod m20240328_000020_create_redeem_codes;
 mod m20240328_000021_create_quota_usage_history;
 mod m20240328_000022_create_subscriptions;
+mod m20240329_000023_add_supported_model_scopes;
 
 pub struct Migrator;
 
@@ -53,6 +54,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240328_000020_create_redeem_codes::Migration),
             Box::new(m20240328_000021_create_quota_usage_history::Migration),
             Box::new(m20240328_000022_create_subscriptions::Migration),
+            Box::new(m20240329_000023_add_supported_model_scopes::Migration),
         ]
     }
 }
