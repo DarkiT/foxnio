@@ -162,7 +162,7 @@ impl OpenAICodexTransform {
         }
 
         if let Some(temp) = request.temperature {
-            if temp < 0.0 || temp > 2.0 {
+            if !(0.0..=2.0).contains(&temp) {
                 return Err(TransformError::InvalidRequest(
                     "Temperature must be between 0 and 2".to_string(),
                 ));
@@ -170,7 +170,7 @@ impl OpenAICodexTransform {
         }
 
         if let Some(top_p) = request.top_p {
-            if top_p < 0.0 || top_p > 1.0 {
+            if !(0.0..=1.0).contains(&top_p) {
                 return Err(TransformError::InvalidRequest(
                     "Top P must be between 0 and 1".to_string(),
                 ));

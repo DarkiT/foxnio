@@ -34,6 +34,12 @@ pub enum StateError {
     StateCorrupted,
 }
 
+impl Default for OpenAIWsStateStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OpenAIWsStateStore {
     pub fn new() -> Self {
         Self {

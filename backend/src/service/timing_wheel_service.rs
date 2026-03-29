@@ -192,7 +192,7 @@ impl TimingWheelService {
         stats.completed_tasks += tasks_to_execute.len() as u64;
         stats.pending_tasks = stats
             .pending_tasks
-            .saturating_sub(tasks_to_execute.len() as usize);
+            .saturating_sub(tasks_to_execute.len());
         stats.current_tick = current_tick;
 
         tasks_to_execute

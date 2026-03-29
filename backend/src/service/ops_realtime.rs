@@ -104,10 +104,7 @@ impl RealtimeMonitor {
 
 /// 解析布尔值字符串
 fn parse_bool_setting(value: &str) -> bool {
-    match value.to_lowercase().trim() {
-        "false" | "0" | "off" | "disabled" => false,
-        _ => true,
-    }
+    !matches!(value.to_lowercase().trim(), "false" | "0" | "off" | "disabled")
 }
 
 #[cfg(test)]

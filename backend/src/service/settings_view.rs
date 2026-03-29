@@ -46,7 +46,7 @@ impl SettingsView {
             let setting = SettingItem {
                 key: key.clone(),
                 value,
-                display_name: key.split('.').last().unwrap_or(&key).to_string(),
+                display_name: key.split('.').next_back().unwrap_or(&key).to_string(),
                 description: None,
                 setting_type: SettingType::String,
                 is_public: false,
@@ -55,7 +55,7 @@ impl SettingsView {
 
             categories
                 .entry(category)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(setting);
         }
 

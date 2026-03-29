@@ -83,15 +83,13 @@ impl GeminiOAuthService {
     /// 获取授权 URL
     pub fn get_authorization_url(&self, state: &str) -> String {
         let scope_str = self.config.scopes.join(" ");
-        let params = vec![
-            ("client_id", self.config.client_id.as_str()),
+        let params = [("client_id", self.config.client_id.as_str()),
             ("redirect_uri", self.config.redirect_uri.as_str()),
             ("response_type", "code"),
             ("scope", &scope_str),
             ("state", state),
             ("access_type", "offline"),
-            ("prompt", "consent"),
-        ];
+            ("prompt", "consent")];
 
         let query = params
             .iter()

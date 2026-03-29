@@ -224,8 +224,8 @@ impl GatewayRequestService {
     fn extract_api_key(&self, headers: &HashMap<String, String>) -> Option<String> {
         // 尝试 Authorization header
         if let Some(auth) = headers.get("authorization") {
-            if auth.starts_with("Bearer ") {
-                return Some(auth[7..].to_string());
+            if let Some(stripped) = auth.strip_prefix("Bearer ") {
+                return Some(stripped.to_string());
             }
             return Some(auth.clone());
         }

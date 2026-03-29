@@ -179,7 +179,7 @@ impl GatewayForwardResponses {
             let anthropic_content: Vec<crate::gateway::responses::AnthropicContentBlock> = msg
                 .content
                 .iter()
-                .filter_map(|c| Self::convert_content(c))
+                .filter_map(Self::convert_content)
                 .collect();
 
             if !anthropic_content.is_empty() {

@@ -246,47 +246,44 @@ impl HealthScorer {
 
     /// 收集健康指标
     async fn collect_health_metrics(&self, score: &HealthScore) -> Result<Vec<HealthMetric>> {
-        let mut metrics = Vec::new();
-
-        // 可用性指标
-        metrics.push(HealthMetric {
-            name: "可用性".to_string(),
-            value: score.availability,
-            weight: self.config.availability_weight,
-            threshold_warning: 70.0,
-            threshold_critical: 50.0,
-            status: score_to_status(score.availability),
-        });
-
-        // 性能指标
-        metrics.push(HealthMetric {
-            name: "性能".to_string(),
-            value: score.performance,
-            weight: self.config.performance_weight,
-            threshold_warning: 70.0,
-            threshold_critical: 50.0,
-            status: score_to_status(score.performance),
-        });
-
-        // 可靠性指标
-        metrics.push(HealthMetric {
-            name: "可靠性".to_string(),
-            value: score.reliability,
-            weight: self.config.reliability_weight,
-            threshold_warning: 70.0,
-            threshold_critical: 50.0,
-            status: score_to_status(score.reliability),
-        });
-
-        // 容量指标
-        metrics.push(HealthMetric {
-            name: "容量".to_string(),
-            value: score.capacity,
-            weight: self.config.capacity_weight,
-            threshold_warning: 70.0,
-            threshold_critical: 50.0,
-            status: score_to_status(score.capacity),
-        });
+        let metrics = vec![
+            // 可用性指标
+            HealthMetric {
+                name: "可用性".to_string(),
+                value: score.availability,
+                weight: self.config.availability_weight,
+                threshold_warning: 70.0,
+                threshold_critical: 50.0,
+                status: score_to_status(score.availability),
+            },
+            // 性能指标
+            HealthMetric {
+                name: "性能".to_string(),
+                value: score.performance,
+                weight: self.config.performance_weight,
+                threshold_warning: 70.0,
+                threshold_critical: 50.0,
+                status: score_to_status(score.performance),
+            },
+            // 可靠性指标
+            HealthMetric {
+                name: "可靠性".to_string(),
+                value: score.reliability,
+                weight: self.config.reliability_weight,
+                threshold_warning: 70.0,
+                threshold_critical: 50.0,
+                status: score_to_status(score.reliability),
+            },
+            // 容量指标
+            HealthMetric {
+                name: "容量".to_string(),
+                value: score.capacity,
+                weight: self.config.capacity_weight,
+                threshold_warning: 70.0,
+                threshold_critical: 50.0,
+                status: score_to_status(score.capacity),
+            },
+        ];
 
         Ok(metrics)
     }
@@ -306,7 +303,7 @@ impl HealthScorer {
                     severity: metric.status.clone(),
                     component: metric.name.clone(),
                     description: format!("{} 得分过低: {:.1}", metric.name, metric.value),
-                    impact: format!("可能影响系统整体稳定性"),
+                    impact: "可能影响系统整体稳定性".to_string(),
                     suggested_action: self.get_suggested_action(&metric.name, metric.value),
                 };
                 issues.push(issue);

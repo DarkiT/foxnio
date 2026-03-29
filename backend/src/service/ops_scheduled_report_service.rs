@@ -327,35 +327,32 @@ impl OpsScheduledReportService {
         _start: DateTime<Utc>,
         _end: DateTime<Utc>,
     ) -> Result<Vec<ReportSection>> {
-        let mut sections = Vec::new();
-
-        // 请求统计章节
-        sections.push(ReportSection {
-            title: "请求统计".to_string(),
-            content: "本周期内的请求统计数据".to_string(),
-            data: HashMap::new(),
-        });
-
-        // 错误分析章节
-        sections.push(ReportSection {
-            title: "错误分析".to_string(),
-            content: "本周期内的错误统计分析".to_string(),
-            data: HashMap::new(),
-        });
-
-        // 性能分析章节
-        sections.push(ReportSection {
-            title: "性能分析".to_string(),
-            content: "本周期内的性能数据分析".to_string(),
-            data: HashMap::new(),
-        });
-
-        // 账号状态章节
-        sections.push(ReportSection {
-            title: "账号状态".to_string(),
-            content: "本周期内的账号使用情况".to_string(),
-            data: HashMap::new(),
-        });
+        let sections = vec![
+            // 请求统计章节
+            ReportSection {
+                title: "请求统计".to_string(),
+                content: "本周期内的请求统计数据".to_string(),
+                data: HashMap::new(),
+            },
+            // 错误分析章节
+            ReportSection {
+                title: "错误分析".to_string(),
+                content: "本周期内的错误统计分析".to_string(),
+                data: HashMap::new(),
+            },
+            // 性能分析章节
+            ReportSection {
+                title: "性能分析".to_string(),
+                content: "本周期内的性能数据分析".to_string(),
+                data: HashMap::new(),
+            },
+            // 账号状态章节
+            ReportSection {
+                title: "账号状态".to_string(),
+                content: "本周期内的账号使用情况".to_string(),
+                data: HashMap::new(),
+            },
+        ];
 
         Ok(sections)
     }

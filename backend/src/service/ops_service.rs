@@ -137,7 +137,7 @@ impl OpsService {
             Self::sanitize_and_trim_request_body(raw, OPS_MAX_STORED_REQUEST_BODY_BYTES);
         let (json, truncated, bytes_len) = sanitized;
 
-        let request_body_json = json.map(|s| s);
+        let request_body_json = json;
         let request_body_bytes = Some(bytes_len as i32);
 
         (request_body_json, truncated, request_body_bytes)

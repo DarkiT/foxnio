@@ -43,7 +43,7 @@ impl SoraSdkClient {
     pub async fn generate(&self, request: &GenerateRequest) -> Result<GenerateResponse, SdkError> {
         let response = self
             .client
-            .post(&format!("{}/v1/generate", self.base_url))
+            .post(format!("{}/v1/generate", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(request)
             .send()
@@ -58,7 +58,7 @@ impl SoraSdkClient {
     pub async fn get_status(&self, id: &str) -> Result<GenerateResponse, SdkError> {
         let response = self
             .client
-            .get(&format!("{}/v1/generate/{}", self.base_url, id))
+            .get(format!("{}/v1/generate/{}", self.base_url, id))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .send()
             .await?

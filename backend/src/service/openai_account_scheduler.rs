@@ -177,7 +177,7 @@ impl OpenAIAccountScheduler {
             ORDER BY created_at ASC
             "#,
         )
-        .bind(&[model])
+        .bind([model])
         .fetch_all(&self.pool)
         .await?;
 
