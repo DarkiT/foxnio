@@ -183,7 +183,7 @@ mod tests {
         ).await.unwrap();
         
         assert_eq!(setting.key, "test_key");
-        assert_eq!(setting.value, "test_value");
+        assert_eq!(setting.value, Some("test_value".to_string()));
         
         // Test get from cache
         let cached = service.get("test_key").await.unwrap();

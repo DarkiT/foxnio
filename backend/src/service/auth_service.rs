@@ -221,8 +221,8 @@ impl AuthService {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_password_hashing() {
+    #[tokio::test]
+    async fn test_password_hashing() {
         let pool = PgPool::connect("postgres://test").await.unwrap();
         let setting_service = Arc::new(SettingService::new(pool.clone()));
         let service = AuthService::new(pool, setting_service, "test_secret".to_string());

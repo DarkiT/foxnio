@@ -95,8 +95,8 @@ mod tests {
         assert!(config.enable_pii_detection);
     }
 
-    #[test]
-    fn test_pii_detection() {
+    #[tokio::test]
+    async fn test_pii_detection() {
         let service = AntigravityPrivacyService::new(
             sqlx::PgPool::connect("postgres://test").await.unwrap(),
             PrivacyConfig::default(),
