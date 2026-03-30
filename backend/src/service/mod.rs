@@ -29,6 +29,8 @@ pub mod health_scorer;
 pub mod identity_service;
 pub mod model_registry;
 pub mod model_router;
+pub mod model_sync;
+pub mod cost_optimizer;
 pub mod oauth;
 pub mod oauth_refresh_api;
 pub mod openai_account_scheduler;
