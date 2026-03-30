@@ -6,9 +6,7 @@
 
 #![allow(dead_code)]
 
-use axum::{
-    body::Body, http::Request, middleware::Next, response::Response, Extension,
-};
+use axum::{body::Body, http::Request, middleware::Next, response::Response, Extension};
 use std::time::Instant;
 use uuid::Uuid;
 
