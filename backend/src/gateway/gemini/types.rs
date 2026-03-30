@@ -272,7 +272,7 @@ pub struct GenerateContentResponse {
     pub candidates: Option<Vec<Candidate>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_feedback: Option<PromptFeedback>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "usageMetadata")]
     pub usage_metadata: Option<UsageMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_version: Option<String>,
@@ -325,8 +325,11 @@ pub struct PromptFeedback {
 /// 使用量元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageMetadata {
+    #[serde(rename = "promptTokenCount")]
     pub prompt_token_count: i32,
+    #[serde(rename = "candidatesTokenCount")]
     pub candidates_token_count: i32,
+    #[serde(rename = "totalTokenCount")]
     pub total_token_count: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_content_token_count: Option<i32>,
