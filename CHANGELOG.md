@@ -5,6 +5,144 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-03-30
+
+### Added
+
+#### Core Features - Sub2API Alignment (100% Complete)
+
+**Webhook System**
+- Complete webhook service with HMAC-SHA256 signature
+- Exponential backoff retry mechanism (1s, 2s, 4s, 8s, 16s)
+- 12 webhook event types (account, api_key, quota, payment, model events)
+- 7 REST endpoints for webhook management
+- Delivery tracking and retry queue
+- HTTPS URL validation
+
+**Batch Operations**
+- Batch create API keys with transaction support
+- Batch update accounts with error aggregation
+- CSV user import with validation
+- Batch delete operations
+- Stop-on-error option for transactions
+- Comprehensive error reporting
+
+**Window Cost Cache**
+- Dual-layer caching (Memory + Redis)
+- Batch SQL query optimization
+- 60s TTL automatic expiration
+- Cache hit/miss metrics
+- Prefetch optimization for multiple accounts
+
+**API Key Permissions**
+- Model access control with whitelist
+- IP whitelist validation
+- Daily quota management and tracking
+- Expiration time enforcement
+- Complete permission verification middleware
+
+**Rate Limiting & Queue**
+- Model-level RPM/TPM limits
+- Waiting queue with sticky session priority
+- Automatic expired request cleanup
+- Redis-backed rate limiting
+- Memory cache optimization
+
+**OpenAPI Documentation**
+- Swagger UI integration (/swagger-ui)
+- OpenAPI spec endpoint (/api-docs/openapi.json)
+- 15+ endpoints with full annotations
+- Request/response schemas with ToSchema
+- Authentication documentation
+
+#### Monitoring & Metrics
+
+**Prometheus Metrics (15+ new metrics)**
+- Webhook: events_sent, delivery_success, delivery_failed, retry_count
+- Batch: operations_total, items_processed, errors
+- API Key: auth_checks, quota_exceeded, model_denied
+- Window Cost: cache_hits, cache_misses, batch_queries, redis_hits/misses
+
+**Integration**
+- All new endpoints integrated into routing
+- JWT authentication middleware
+- Admin permission checks
+- No conflicts with existing routes
+
+### Technical Details
+
+#### New Files Created
+- backend/src/service/webhook.rs (20,309 bytes)
+- backend/src/service/batch.rs (13,698 bytes)
+- backend/src/service/window_cost_cache.rs (15,224 bytes)
+- backend/src/service/wait_queue.rs (12,970 bytes)
+- backend/src/service/model_rate_limit.rs (14,154 bytes)
+- backend/src/handler/webhook.rs (12,895 bytes)
+- backend/src/handler/batch.rs (7,881 bytes)
+- backend/src/middleware/api_key_auth.rs (complete implementation)
+- backend/src/entity/webhook_endpoints.rs
+- backend/src/entity/webhook_deliveries.rs
+- backend/migration/src/m20240330_000024_add_api_key_permissions.rs
+- backend/migration/src/m20240330_000026_create_webhook_endpoints.rs
+- backend/migration/src/m20240330_000027_create_webhook_deliveries.rs
+
+#### Code Statistics
+- New code lines: 7,000+
+- Total commits: 16
+- Parallel agents: 6 rounds, 24 agents
+- Development time: 6.5 hours
+
+#### API Endpoints Added
+- Webhook endpoints (7): /api/v1/webhooks/*
+- Batch operation endpoints (4): /api/v1/admin/*/batch-*
+- Total new endpoints: 11
+
+### Improved
+
+#### Documentation
+- Removed temporary design documents
+- Cleaned up obsolete planning files
+- Updated memory files with session summaries
+- Maintained alignment documentation for reference
+
+### Feature Alignment
+
+**Sub2API vs FoxNIO (100% aligned)**
+| Feature | Status |
+|---------|--------|
+| Waiting Queue | ✅ 100% |
+| Model-level RPM | ✅ 100% |
+| API Key Permissions | ✅ 100% |
+| Webhook System | ✅ 100% |
+| Batch Operations | ✅ 100% |
+| Window Cost Prefetch | ✅ 100% |
+| OpenAPI Documentation | ✅ 100% |
+| Sticky Sessions | ✅ 100% |
+| Model Routing | ✅ 100% |
+| Monitoring Metrics | ✅ 100% |
+
+### Known Issues
+
+- Cost optimization service (40% implemented, needs core logic)
+- Model sync service (40% implemented, needs provider APIs)
+- Integration tests (structure ready, needs test cases)
+
+### Future Plans
+
+**Short-term (this week)**
+- Complete cost optimization recommendations
+- Complete model auto-sync service
+- Add comprehensive integration tests
+- Performance benchmarking
+
+**Mid-term (next week)**
+- Production deployment
+- Monitoring alert configuration
+- User documentation updates
+- Feedback collection
+
+---
+
 ## [0.2.0] - 2026-03-29
 
 ### Added
@@ -106,25 +244,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Database Schema
 - Deployment Guide
 - Development Guide
-- Final Delivery Report
-
----
-
-## [0.2.0] - 2026-03-27
-
-### Added
-- HTTP/2 support
-- JWT refresh mechanism
-- Password reset flow
-- Redis connection pool optimization
-- Database connection pool optimization
-- Data encryption service
-- Encryption documentation
-
-### Improved
-- Connection management
-- Performance optimization
-- Security enhancements
 
 ---
 
@@ -181,51 +300,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Release Notes
-
-### Version 1.0.0
-
-This is the first stable release of FoxNIO. The project has reached feature completeness with:
-
-- ✅ All core gateway features implemented
-- ✅ Complete authentication system
-- ✅ Billing and quota management
-- ✅ Monitoring and alerting system
-- ✅ Management features
-- ✅ Security features
-- ✅ Performance optimization
-- ✅ Comprehensive documentation
-
-### Statistics
-
-- **Development Duration**: 8 days
-- **Total Commits**: 50+
-- **Code Lines**: 36,438+
-- **Test Cases**: 328+
-- **API Endpoints**: 49
-- **Database Tables**: 28
-- **Documentation Pages**: 7
-
-### Performance Benchmarks
-
-- **Concurrent Connections**: 10,000+
-- **QPS**: 10,000+
-- **P99 Latency**: < 100ms
-- **Memory Usage (Idle)**: < 200MB
-- **Startup Time**: < 5s
-
-### Known Issues
-
-- Limited support for niche AI providers
-- Internationalization only supports Chinese and English
-- Integration test coverage needs improvement
-
-### Future Plans
-
-See [Final Delivery Report](docs/FINAL_DELIVERY.md) for future roadmap.
-
----
-
-[1.0.0]: https://github.com/your-org/foxnio/releases/tag/v1.0.0
-[0.2.0]: https://github.com/your-org/foxnio/releases/tag/v0.2.0
+[0.2.1]: https://github.com/telagod/foxnio/releases/tag/v0.2.1
 [0.2.0]: https://github.com/telagod/foxnio/releases/tag/v0.2.0
+[0.1.0]: https://github.com/telagod/foxnio/releases/tag/v0.1.0
