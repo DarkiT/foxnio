@@ -110,6 +110,8 @@ pub mod user_subscription;
 pub mod user_test;
 
 // P0 - 新增服务文件
+pub mod webhook;
+pub mod window_cost_cache;
 pub mod account_quota_reset;
 pub mod account_rpm;
 pub mod account_test_service;
