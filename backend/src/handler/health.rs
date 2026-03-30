@@ -14,7 +14,9 @@ use std::sync::Arc;
 use crate::health::{AggregateHealthStatus, HealthChecker};
 
 /// 简单健康状态
-pub async fn health_simple(Extension(checker): Extension<Arc<HealthChecker>>) -> Json<serde_json::Value> {
+pub async fn health_simple(
+    Extension(checker): Extension<Arc<HealthChecker>>,
+) -> Json<serde_json::Value> {
     let status = checker.check_critical().await;
 
     let (status_str, _code) = if status.healthy {
@@ -105,7 +107,9 @@ pub async fn health_resources(
 }
 
 /// 数据库连接池状态
-pub async fn health_database(Extension(checker): Extension<Arc<HealthChecker>>) -> Json<serde_json::Value> {
+pub async fn health_database(
+    Extension(checker): Extension<Arc<HealthChecker>>,
+) -> Json<serde_json::Value> {
     // 使用 HealthChecker 进行简单的健康检查
     let status = checker.check_all().await;
 
@@ -117,7 +121,9 @@ pub async fn health_database(Extension(checker): Extension<Arc<HealthChecker>>) 
 }
 
 /// Redis 状态
-pub async fn health_redis(Extension(checker): Extension<Arc<HealthChecker>>) -> Json<serde_json::Value> {
+pub async fn health_redis(
+    Extension(checker): Extension<Arc<HealthChecker>>,
+) -> Json<serde_json::Value> {
     // 使用 HealthChecker 进行简单的健康检查
     let status = checker.check_all().await;
 

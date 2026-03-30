@@ -10,7 +10,7 @@ pub mod uuid_conv;
 pub mod validator;
 
 // 重导出常用类型
-pub use uuid_conv::{uuid_to_i64, i64_to_uuid};
+pub use uuid_conv::{i64_to_uuid, uuid_to_i64};
 
 // 请求 ID 生成
 pub fn request_id() -> String {
