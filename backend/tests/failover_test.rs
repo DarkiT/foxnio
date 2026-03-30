@@ -99,6 +99,10 @@ mod tests {
             retry_delay_ms: 100,
             backoff_base: 2.0,
             max_backoff_ms: 5000,
+            max_same_account_retries: 3,
+            same_account_retry_delay_ms: 500,
+            google_config_error_cooldown_secs: 60,
+            empty_response_cooldown_secs: 30,
         };
 
         // 验证退避时间计算
