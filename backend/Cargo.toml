@@ -96,6 +96,13 @@ pin-project-lite = "0.2"
 # Configuration
 dotenvy = "0.15"
 
+# CSV parsing
+csv = "1.3"
+
+# OpenAPI / Swagger
+utoipa = { version = "4", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "4", features = ["axum"] }
+
 # System (for health checks)
 nix = { version = "0.27", features = ["fs"] }
 

@@ -28,16 +28,23 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize)]
+/// 用户注册请求
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
+    /// 用户邮箱
     pub email: String,
+    /// 密码（至少 8 个字符）
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
+/// 用户登录请求
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
+    /// 用户邮箱
     pub email: String,
+    /// 密码
     pub password: String,
 }
 

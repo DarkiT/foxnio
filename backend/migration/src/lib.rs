@@ -24,6 +24,9 @@ mod m20240328_000020_create_redeem_codes;
 mod m20240328_000021_create_quota_usage_history;
 mod m20240328_000022_create_subscriptions;
 mod m20240329_000023_add_supported_model_scopes;
+mod m20240330_000024_add_api_key_permissions;
+mod m20240330_000026_create_webhook_endpoints;
+mod m20240330_000027_create_webhook_deliveries;
 
 pub struct Migrator;
 
@@ -55,6 +58,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20240328_000021_create_quota_usage_history::Migration),
             Box::new(m20240328_000022_create_subscriptions::Migration),
             Box::new(m20240329_000023_add_supported_model_scopes::Migration),
+            Box::new(m20240330_000024_add_api_key_permissions::Migration),
+            Box::new(m20240330_000026_create_webhook_endpoints::Migration),
+            Box::new(m20240330_000027_create_webhook_deliveries::Migration),
         ]
     }
 }
