@@ -132,7 +132,7 @@ jobs:
         env:
           DATABASE_URL: postgres://foxnio:foxnio@localhost:5432/foxnio_test
           REDIS_URL: redis://localhost:6379
-        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+        run: cargo llvm-cov --lib --workspace --lcov --output-path lcov.info
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
