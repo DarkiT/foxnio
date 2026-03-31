@@ -141,7 +141,7 @@ pub async fn get_model(
 
 /// POST /v1beta/models/:model:generateContent - 生成内容（非流式）
 pub async fn generate_content(
-    Extension(state): Extension<SharedState>,
+    Extension(_state): Extension<SharedState>,
     Path(model_action): Path<String>,
     Query(params): Query<GeminiQueryParams>,
     body: Bytes,

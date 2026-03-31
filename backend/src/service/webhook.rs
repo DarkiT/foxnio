@@ -308,7 +308,7 @@ impl WebhookService {
         let max_attempts = endpoint.max_retries as usize + 1; // 首次 + 重试次数
 
         for attempt in 0..max_attempts {
-            let payload_str = serde_json::to_string(&payload)?;
+            let _payload_str = serde_json::to_string(&payload)?;
 
             match self.send_request(&endpoint, &payload).await {
                 Ok(response) => {

@@ -1187,7 +1187,7 @@ impl ModelSyncService {
         let model_name = model.name.strip_prefix("models/").unwrap_or(&model.name);
 
         // Gemini 模型价格映射
-        let (input_price, output_price, context_window) = if model_name.contains("gemini-2.0") {
+        let (input_price, output_price, _context_window) = if model_name.contains("gemini-2.0") {
             (0.0, 0.0, 1048576) // Gemini 2.0 Flash is free
         } else if model_name.contains("gemini-1.5-pro") {
             (1.25, 5.0, 2097152)

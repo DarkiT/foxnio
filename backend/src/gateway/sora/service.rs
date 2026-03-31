@@ -265,8 +265,8 @@ impl SoraRouterService {
     /// 处理生成请求（预扣费）
     pub async fn prepare_generation(
         &self,
-        user_id: Uuid,
-        api_key_id: Uuid,
+        _user_id: Uuid,
+        _api_key_id: Uuid,
         request: &SoraGenerateRequest,
     ) -> Result<(SoraModelConfig, i64)> {
         // 验证请求并获取模型配置
@@ -292,7 +292,7 @@ impl SoraRouterService {
         error_message: Option<String>,
     ) -> Result<()> {
         // 创建使用记录
-        let usage = usages::ActiveModel {
+        let _usage = usages::ActiveModel {
             id: sea_orm::ActiveValue::Set(Uuid::new_v4()),
             user_id: sea_orm::ActiveValue::Set(user_id),
             api_key_id: sea_orm::ActiveValue::Set(api_key_id),

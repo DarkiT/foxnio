@@ -655,7 +655,7 @@ impl CostOptimizerService {
     fn detect_repetitive_queries(
         &self,
         data: &[UsageRecord],
-        total_cost: f64,
+        _total_cost: f64,
     ) -> Option<UsagePattern> {
         // 统计每个 prompt_hash 的出现次数
         let mut hash_counts: HashMap<String, i64> = HashMap::new();

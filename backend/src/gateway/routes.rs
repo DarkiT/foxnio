@@ -30,8 +30,8 @@ use crate::service::{
 use crate::state::AppState;
 use utoipa::OpenApi;
 
-pub fn build_app(state: AppState, health_checker: Arc<HealthChecker>) -> Router<()> {
-    let shared_state = Arc::new(state);
+pub fn build_app(state: AppState, _health_checker: Arc<HealthChecker>) -> Router<()> {
+    let _shared_state = Arc::new(state);
 
     // 公开路由
     let public_routes = Router::new()
@@ -623,7 +623,7 @@ pub fn build_app(state: AppState, health_checker: Arc<HealthChecker>) -> Router<
         .layer(axum::middleware::from_fn(middleware::jwt_auth));
 
     // WebSocket 路由 - OpenAI Realtime/Responses API
-    let ws_handler = Arc::new(websocket::create_handler(WSConfig::default()));
+    let _ws_handler = Arc::new(websocket::create_handler(WSConfig::default()));
     let ws_routes = Router::new()
         // OpenAI Realtime API v1 - WebSocket
         .route("/v1/realtime", get(websocket::handler::ws_realtime_v1))
@@ -742,7 +742,7 @@ pub fn build_app(state: AppState, health_checker: Arc<HealthChecker>) -> Router<
 
 async fn handle_chat_completions(
     Extension(_state): Extension<SharedState>,
-    Extension(claims): Extension<crate::service::user::Claims>,
+    Extension(_claims): Extension<crate::service::user::Claims>,
     body: axum::body::Bytes,
 ) -> Result<axum::Json<serde_json::Value>, handler::ApiError> {
     // 解析请求体
@@ -759,7 +759,7 @@ async fn handle_chat_completions(
 
     let _stream = req.get("stream").and_then(|s| s.as_bool()).unwrap_or(false);
 
-    let _user_id = uuid::Uuid::parse_str(&claims.sub)
+    let _user_id = uuid::Uuid::parse_str(&_claims.sub)
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // TODO: 实现完整的请求转发
@@ -976,7 +976,7 @@ async fn test_account(
 
 /// 处理 Sora 图片生成请求
 async fn handle_sora_image_generation(
-    Extension(state): Extension<SharedState>,
+    Extension(_state): Extension<SharedState>,
     Extension(claims): Extension<crate::service::user::Claims>,
     body: axum::body::Bytes,
 ) -> Result<axum::Json<serde_json::Value>, handler::ApiError> {
@@ -985,7 +985,7 @@ async fn handle_sora_image_generation(
     let request: SoraGenerateRequest = serde_json::from_slice(&body)
         .map_err(|e| handler::ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let user_id = uuid::Uuid::parse_str(&claims.sub)
+    let _user_id = uuid::Uuid::parse_str(&claims.sub)
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // 创建 Sora 服务
@@ -1017,7 +1017,7 @@ async fn handle_sora_image_generation(
 
 /// 处理 Sora 视频生成请求
 async fn handle_sora_video_generation(
-    Extension(state): Extension<SharedState>,
+    Extension(_state): Extension<SharedState>,
     Extension(claims): Extension<crate::service::user::Claims>,
     body: axum::body::Bytes,
 ) -> Result<axum::Json<serde_json::Value>, handler::ApiError> {
@@ -1026,7 +1026,7 @@ async fn handle_sora_video_generation(
     let request: SoraGenerateRequest = serde_json::from_slice(&body)
         .map_err(|e| handler::ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let user_id = uuid::Uuid::parse_str(&claims.sub)
+    let _user_id = uuid::Uuid::parse_str(&claims.sub)
         .map_err(|e| handler::ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // 创建 Sora 服务
@@ -1075,7 +1075,7 @@ async fn get_sora_generation_status(
 /// 处理提示词增强请求
 async fn handle_prompt_enhance(
     Extension(_state): Extension<SharedState>,
-    Extension(claims): Extension<crate::service::user::Claims>,
+    Extension(_claims): Extension<crate::service::user::Claims>,
     body: axum::body::Bytes,
 ) -> Result<axum::Json<serde_json::Value>, handler::ApiError> {
     use super::sora::{SoraGenerateRequest, SoraService};
