@@ -998,6 +998,9 @@ fn build_weighted_selection_order(candidates: &[CandidateScore]) -> Vec<Candidat
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
+
+    use super::super::AccountStatus;
 
     #[test]
     fn test_account_load_info() {
