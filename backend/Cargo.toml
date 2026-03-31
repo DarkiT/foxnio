@@ -110,6 +110,10 @@ nix = { version = "0.27", features = ["fs"] }
 prometheus = "0.13"
 lazy_static = "1.4"
 
+[features]
+default = []
+tls-custom = []
+
 [dev-dependencies]
 tokio-test = "0.4"
 

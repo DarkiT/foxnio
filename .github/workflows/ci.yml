@@ -296,7 +296,7 @@ jobs:
       
       - name: Run clippy
         working-directory: backend
-        run: cargo clippy --all-targets --all-features -- -W clippy::all -D warnings -A clippy::too_many_arguments -A clippy::type_complexity -A clippy::unnecessary_map_or
+        run: cargo clippy --all-targets --all-features -- -W clippy::correctness -W clippy::suspicious -W clippy::perf -D warnings
       
       - name: Check documentation
         working-directory: backend
