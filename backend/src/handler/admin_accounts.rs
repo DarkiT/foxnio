@@ -13,6 +13,7 @@ use super::ApiError;
 use crate::gateway::middleware::permission::check_permission;
 use crate::gateway::SharedState;
 use crate::service::account::AccountService;
+use crate::service::batch_import::{BatchImportConfig, BatchImportService, ImportAccountItem};
 use crate::service::batch_operations::{
     BatchCreateAccountsRequest, BatchOperationService, CreateAccountItem,
 };
@@ -24,6 +25,29 @@ use crate::service::user::Claims;
 pub struct BatchUpdateCredentialsRequest {
     pub account_ids: Vec<String>,
     pub credential: String,
+}
+
+/// 高性能批量导入请求
+#[derive(Debug, Deserialize)]
+pub struct FastImportRequest {
+    /// 账号列表
+    pub accounts: Vec<ImportAccountItem>,
+    /// 每批次大小（可选，默认 1000）
+    #[serde(default)]
+    pub batch_size: Option<usize>,
+    /// 并发验证数（可选，默认 50）
+    #[serde(default)]
+    pub validation_concurrency: Option<usize>,
+    /// 是否跳过重复（默认 true）
+    #[serde(default = "default_skip_duplicates")]
+    pub skip_duplicates: bool,
+    /// 是否快速导入（跳过验证，默认 false）
+    #[serde(default)]
+    pub fast_mode: bool,
+}
+
+fn default_skip_duplicates() -> bool {
+    true
 }
 
 /// POST /api/v1/admin/accounts/batch - 批量创建账号
@@ -472,5 +496,89 @@ pub async fn batch_refresh_tier(
     Ok(Json(json!({
         "success": true,
         "results": results,
+    })))
+}
+
+/// POST /api/v1/admin/accounts/fast-import - 高性能批量导入
+///
+/// 支持几千到几万账号的高性能导入：
+/// - 真正的批量 SQL INSERT（每批 1000 条）
+/// - 并行凭证验证（50 并发）
+/// - 自动去重
+/// - 事务保证
+///
+/// 请求体:
+/// ```json
+/// {
+///   "accounts": [
+///     {
+///       "name": "account-1",
+///       "provider": "anthropic",
+///       "credential": "sk-ant-xxx",
+///       "priority": 50
+///     }
+///   ],
+///   "batch_size": 1000,        // 可选，每批大小
+///   "validation_concurrency": 50,  // 可选，验证并发数
+///   "skip_duplicates": true,    // 可选，跳过重复
+///   "fast_mode": false          // 可选，跳过验证（仅信任数据源）
+/// }
+/// ```
+pub async fn fast_import_accounts(
+    Extension(state): Extension<SharedState>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<FastImportRequest>,
+) -> Result<Json<Value>, ApiError> {
+    check_permission(&claims, Permission::AccountWrite)
+        .await
+        .map_err(|e| ApiError(StatusCode::FORBIDDEN, e))?;
+
+    if req.accounts.is_empty() {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "No accounts provided".into(),
+        ));
+    }
+
+    // 限制最大批次
+    if req.accounts.len() > 100_000 {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "Maximum 100,000 accounts per request".into(),
+        ));
+    }
+
+    let config = BatchImportConfig {
+        batch_size: req.batch_size.unwrap_or(1000),
+        validation_concurrency: req.validation_concurrency.unwrap_or(50),
+        skip_duplicates: req.skip_duplicates,
+        continue_on_error: true,
+    };
+
+    let import_service = BatchImportService::with_config(state.db.clone(), config);
+
+    let result = if req.fast_mode {
+        // 快速模式：跳过验证，直接导入
+        import_service
+            .fast_import(req.accounts)
+            .await
+            .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    } else {
+        // 正常模式：验证 + 导入
+        import_service
+            .import_accounts(req.accounts)
+            .await
+            .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    };
+
+    Ok(Json(json!({
+        "success": true,
+        "total": result.total,
+        "imported": result.imported,
+        "skipped": result.skipped,
+        "failed": result.failed,
+        "duration_ms": result.duration_ms,
+        "errors": result.errors.iter().take(10).collect::<Vec<_>>(), // 只返回前 10 个错误
+        "account_ids": result.account_ids.iter().take(100).collect::<Vec<_>>(), // 只返回前 100 个 ID
     })))
 }

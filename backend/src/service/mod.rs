@@ -11,6 +11,7 @@ pub mod audit;
 pub mod auth_service;
 pub mod backup;
 pub mod batch;
+pub mod batch_import;
 pub mod batch_operations;
 pub mod bedrock;
 pub mod billing;
