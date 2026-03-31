@@ -71,7 +71,6 @@ impl IntoResponse for ApiKeyAuthError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Box::leak(msg.clone().into_boxed_str()) as &str,
             ),
-            ApiKeyAuthError::MissingApiKey => (StatusCode::UNAUTHORIZED, "API key is required"),
         };
 
         (status, Json(json!({ "error": error_msg }))).into_response()
