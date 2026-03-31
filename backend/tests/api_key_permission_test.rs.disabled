@@ -13,7 +13,7 @@
 #![allow(clippy::all)]
 
 use axum::{
-    body::Body,
+    body::{to_bytes, Body},
     extract::ConnectInfo,
     http::{header::AUTHORIZATION, Request, StatusCode},
     middleware,
@@ -30,9 +30,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 // 导入项目模块
-use backend::entity::api_keys;
-use backend::gateway::SharedState;
-use backend::middleware::api_key_auth::{api_key_auth_with_permissions, ApiKeyAuthError};
+use foxnio::entity::api_keys;
+use foxnio::gateway::SharedState;
+use foxnio::middleware::api_key_auth::{api_key_auth_with_permissions, ApiKeyAuthError};
 
 mod common;
 use common::*;
@@ -232,8 +232,8 @@ fn mock_request_from_ip(
 
 /// 创建测试用的 SharedState
 fn create_test_state(db: DatabaseConnection) -> SharedState {
-    use backend::cache::RedisPool;
-    use backend::config::Config;
+    use foxnio::cache::RedisPool;
+    use foxnio::config::Config;
     use std::sync::Arc;
 
     SharedState {
@@ -333,7 +333,7 @@ async fn test_model_permission_denied() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     // 验证错误消息
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
     assert!(error["error"].as_str().unwrap().contains("not allowed"));
 }
@@ -494,7 +494,7 @@ async fn test_ip_whitelist_denied() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     // 验证错误消息
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
     assert!(error["error"].as_str().unwrap().contains("IP"));
     assert!(error["error"].as_str().unwrap().contains("not allowed"));
@@ -631,7 +631,7 @@ async fn test_quota_enforcement() {
     assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
 
     // 验证错误消息
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
     assert!(error["error"].as_str().unwrap().contains("quota"));
 }
@@ -754,7 +754,7 @@ async fn test_expired_key() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
     // 验证错误消息
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
     assert!(error["error"].as_str().unwrap().contains("expired"));
 }
@@ -801,7 +801,7 @@ async fn test_disabled_key() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
     // 验证错误消息
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
     assert!(error["error"].as_str().unwrap().contains("disabled"));
 }
@@ -1171,7 +1171,7 @@ async fn test_error_messages() {
     );
 
     let response = protected_app.oneshot(request).await.unwrap();
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
 
     // 验证错误消息包含 "expired"
@@ -1216,7 +1216,7 @@ async fn test_error_messages() {
     );
 
     let response = protected_app2.oneshot(request).await.unwrap();
-    let body: bytes::Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body: bytes::Bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     let error: Value = serde_json::from_slice(&body).unwrap();
 
     // 验证错误消息包含模型名称
