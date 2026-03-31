@@ -624,11 +624,13 @@ pub async fn batch_create_users(
             created_at: Utc::now(),
         };
 
+        let status = user.status.clone();
+        let role = user.role.clone();
         let info = UserInfo {
             id: user.id,
             email: user.email.clone(),
-            role: user.role,
-            status: user.status,
+            role,
+            status,
             created_at: user.created_at,
         };
 

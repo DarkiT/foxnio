@@ -1,6 +1,7 @@
 // Claude Code Shell 集成测试
 
 use foxnio::gateway::claude_shell::{
+    error::error_types,
     parse_sse_line, parse_sse_stream,
     request::{Message, MessageContent, MessageRequest},
     ClaudeShell, ClaudeShellConfig,
