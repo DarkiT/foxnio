@@ -1,4 +1,4 @@
-# FoxNIO Configuration - 优化版
+# FoxNIO Configuration
 # FoxNIO API Gateway 配置文件
 
 # 服务器配置
@@ -7,38 +7,30 @@ server:
   port: 8080
   mode: "release"  # debug | release
 
-# 数据库配置（已优化）
+# 数据库配置
 database:
   host: "localhost"
   port: 5432
   user: "postgres"
   password: ""
   dbname: "foxnio"
-  max_connections: 50      # 从10提升到50，支持更高并发
-  min_connections: 10      # 新增：预热连接数
-  connect_timeout: 10      # 从30秒缩短到10秒
-  idle_timeout: 300        # 新增：空闲连接超时5分钟
-  max_lifetime: 1800       # 新增：连接最大生命周期30分钟
+  max_connections: 10
 
-# Redis 配置（已优化）
+# Redis 配置
 redis:
   host: "localhost"
   port: 6379
   password: ""
   db: 0
-  pool_size: 20            # 新增：连接池大小
-  timeout: 5               # 新增：超时时间5秒
-  local_cache_size: 2000   # 新增：本地缓存大小
-  local_cache_ttl: 30      # 新增：本地缓存TTL 30秒
 
 # JWT 配置
 jwt:
   secret: "change-this-to-a-secure-random-string-in-production"
   expire_hours: 24
 
-# 网关配置（已优化）
+# 网关配置
 gateway:
-  user_concurrency: 10     # 从5提升到10
+  user_concurrency: 5
   user_balance: 0
   api_key_prefix: "sk-fox-"
   rate_multiplier: 1.0
@@ -55,14 +47,14 @@ http2:
   max_frame_size: 16384
   max_header_list_size: 65536
 
-# HTTP/2 客户端配置（已优化）
+# HTTP/2 客户端配置
 http2_client:
   enabled: true
-  pool_size: 64            # 从16提升到64
-  connect_timeout_secs: 5  # 从10秒缩短到5秒
+  pool_size: 16
+  connect_timeout_secs: 10
   request_timeout_secs: 300
-  pool_keep_alive_secs: 120  # 从90秒延长到120秒
-  max_idle_connections: 128  # 从32提升到128
+  pool_keep_alive_secs: 90
+  max_idle_connections: 32
   tcp_keepalive_secs: 60
   tcp_nodelay: true
   auto_negotiate: true
@@ -74,29 +66,6 @@ compression:
   brotli: true
   min_size: 1024
   level: "default"  # fast | default | best
-
-# ============================================================
-# 等待队列配置（新增）
-# ============================================================
-waiting_queue:
-  max_concurrent: 200      # 最大并发数
-  max_queue_size: 200      # 最大队列长度
-  default_timeout_ms: 15000  # 默认超时15秒
-  enable_priority: true    # 启用优先级队列
-  check_interval_ms: 100   # 检查间隔
-  max_wait_time_secs: 120  # 最大等待时间2分钟
-
-# ============================================================
-# 调度器配置（新增）
-# ============================================================
-scheduler:
-  default_strategy: "adaptive"  # 自适应调度
-  sticky_session_ttl_secs: 3600
-  health_check_interval_secs: 30
-  account_cooldown_secs: 120    # 冷却时间2分钟
-  adaptive_update_interval_secs: 10
-  min_available_accounts: 1
-  enable_cost_optimization: true
 
 # ============================================================
 # 角色权限配置
@@ -158,3 +127,49 @@ roles:
       - billing_read
       - announcement_read
     description: "访客只有只读访问权限"
+
+# 自定义角色（可选）
+# 可以添加自定义角色来扩展权限系统
+# custom_roles:
+#   - role: "support"
+#     permissions:
+#       - user_read
+#       - billing_read
+#       - audit_log_read
+#     description: "客服角色，可查看用户和账单信息"
+
+# ============================================================
+# 权限说明
+# ============================================================
+# 
+# 用户管理权限:
+#   - user_read:    查看用户信息
+#   - user_write:   创建/编辑用户
+#   - user_delete:  删除用户
+#
+# API Key 管理权限:
+#   - api_key_read:    查看 API Key
+#   - api_key_write:   创建/编辑 API Key
+#   - api_key_delete:  删除 API Key
+#
+# 账号管理权限:
+#   - account_read:   查看账号信息
+#   - account_write:  创建/编辑账号
+#
+# 系统管理权限:
+#   - system_config:  系统配置管理
+#   - audit_log_read: 查看审计日志
+#
+# 订阅管理权限:
+#   - subscription_read:  查看订阅信息
+#   - subscription_write: 管理订阅
+#
+# 计费管理权限:
+#   - billing_read:   查看计费信息
+#   - billing_write:  管理计费
+#
+# 公告管理权限:
+#   - announcement_read:   查看公告
+#   - announcement_write:  管理公告
+#
+# ============================================================
