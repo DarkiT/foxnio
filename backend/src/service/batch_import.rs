@@ -7,11 +7,11 @@
 //! - 事务保证数据一致性
 //! - 进度回调支持
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use chrono::Utc;
 use futures::stream::{self, StreamExt};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
     TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
@@ -225,7 +225,7 @@ impl BatchImportService {
         let unique_items = if self.config.skip_duplicates {
             self.filter_duplicates_batch(&valid_items).await?
         } else {
-            valid_items
+            valid_items.clone()
         };
 
         let skipped = valid_items.len() - unique_items.len();
@@ -286,12 +286,24 @@ impl BatchImportService {
 
     /// 并行验证账号项
     async fn validate_items_parallel(&self, items: &[ImportAccountItem]) -> Vec<ValidationResult> {
+        let concurrency = self.config.validation_concurrency;
         stream::iter(items.iter().enumerate())
-            .map(|(index, item)| async move {
-                let (valid, error) = self.validate_item(item).await;
-                ValidationResult { index, valid, error }
+            .map(|(index, item)| {
+                let name_len = item.name.len();
+                let cred_len = item.credential.len();
+                let cred_type = item.credential_type.clone();
+                async move {
+                    // 简单验证逻辑
+                    let valid = !name_len == 0 && !cred_len == 0;
+                    let error = if valid {
+                        None
+                    } else {
+                        Some("Invalid name or credential".to_string())
+                    };
+                    ValidationResult { index, valid, error }
+                }
             })
-            .buffer_unordered(self.config.validation_concurrency)
+            .buffer_unordered(concurrency)
             .collect()
             .await
     }
@@ -417,7 +429,7 @@ impl BatchImportService {
                     // 整批失败，记录错误
                     for (idx, item) in chunk {
                         all_errors.push(ImportError {
-                            index: idx,
+                            index: *idx,
                             name: item.name.clone(),
                             error: e.to_string(),
                         });

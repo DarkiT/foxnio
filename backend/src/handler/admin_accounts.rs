@@ -555,16 +555,17 @@ pub async fn fast_import_accounts(
         continue_on_error: true,
     };
 
-    let import_service = BatchImportService::with_config(state.db.clone(), config);
-
+    let db = state.db.clone();
     let result = if req.fast_mode {
         // 快速模式：跳过验证，直接导入
+        let import_service = BatchImportService::with_config(db, config);
         import_service
             .fast_import(req.accounts)
             .await
             .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     } else {
         // 正常模式：验证 + 导入
+        let import_service = BatchImportService::with_config(db, config);
         import_service
             .import_accounts(req.accounts)
             .await

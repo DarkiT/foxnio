@@ -257,10 +257,11 @@ pub fn build_app(state: AppState, _health_checker: Arc<HealthChecker>) -> Router
             post(handler::admin_accounts::batch_refresh_tier),
         )
         // 高性能批量导入 - 支持几千到几万账号
-        .route(
-            "/api/v1/admin/accounts/fast-import",
-            post(handler::admin_accounts::fast_import_accounts),
-        )
+        // 暂时禁用，等待修复 Send trait 问题
+        // .route(
+        //     "/api/v1/admin/accounts/fast-import",
+        //     post(handler::admin_accounts::fast_import_accounts),
+        // )
         // API Key 管理 - 需要 ApiKeyRead 权限
         .route("/api/v1/admin/apikeys", get(handler::admin::list_apikeys))
         // 统计和监控 - 需要 BillingRead 权限
