@@ -7,6 +7,19 @@ pub struct AccountService {
     pool: PgPool,
 }
 
+/// 创建账号的请求参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateAccountRequest {
+    pub name: String,
+    pub provider: String,
+    pub credentials: String,
+    pub models: Vec<String>,
+    pub priority: i32,
+    pub concurrency: u32,
+    pub load_factor: f64,
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Account {
     pub id: i64,
@@ -207,26 +220,20 @@ impl AccountService {
     /// Create account with scheduling config
     pub async fn create_with_scheduling(
         &self,
-        name: String,
-        provider: String,
-        credentials: String,
-        models: Vec<String>,
-        priority: i32,
-        concurrency: u32,
-        load_factor: f64,
+        req: CreateAccountRequest,
     ) -> Result<AccountWithScheduling, AccountError> {
         let account = query_as::<_, AccountWithScheduling>(r#"
             INSERT INTO accounts (name, provider, status, credentials, models, priority, concurrency, load_factor, created_at, updated_at)
             VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, NOW(), NOW())
             RETURNING id, name, provider, status, credentials, models, priority, concurrency, load_factor, created_at, updated_at
             "#)
-            .bind(name)
-            .bind(provider)
-            .bind(credentials)
-            .bind(&models)
-            .bind(priority)
-            .bind(concurrency as i32)
-            .bind(load_factor)
+            .bind(req.name)
+            .bind(req.provider)
+            .bind(req.credentials)
+            .bind(&req.models)
+            .bind(req.priority)
+            .bind(req.concurrency as i32)
+            .bind(req.load_factor)
             .fetch_one(&self.pool)
             .await?;
 
